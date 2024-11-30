@@ -6,6 +6,7 @@ ARG KUBECTL_VERSION=1.31.3
 ARG TERRAFORM_DOCS_VERSION=0.19.0
 ARG TERRAFORM_VERSION=1.10.0
 ARG TFLINT_VERSION=0.54.0
+ARG TRIVY_VERSION=0.57.1
 
 RUN apt-get update && apt-get install -y \
     unzip \
@@ -42,3 +43,5 @@ RUN asdf plugin-add terraform-docs https://github.com/looztra/asdf-terraform-doc
 RUN asdf install terraform-docs $TERRAFORM_DOCS_VERSION
 RUN asdf plugin-add tflint https://github.com/skyzyx/asdf-tflint
 RUN asdf install tflint $TFLINT_VERSION
+RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
+RUN asdf install trivy $TRIVY_VERSION
