@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: github.ref == 'refs/heads/main'
+          push: ${github.ref == 'refs/heads/main'}
           tags: |
             ghcr.io/cwimmer/devcontainer:latest
           platforms: linux/amd64,linux/arm64
