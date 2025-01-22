@@ -2,6 +2,7 @@
 FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.14.1
 ARG DOCTL_VERSION=1.119.0
+ARG GOLANG_VERSION=1.23.5
 ARG KUBECTL_VERSION=1.32.0
 ARG TERRAFORM_DOCS_VERSION=0.19.0
 ARG TERRAFORM_VERSION=1.10.0
@@ -45,3 +46,5 @@ RUN asdf plugin-add tflint https://github.com/skyzyx/asdf-tflint
 RUN asdf install tflint $TFLINT_VERSION
 RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
 RUN asdf install trivy $TRIVY_VERSION
+RUN asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
+RUN asdf install golang $GOLANG_VERSION
