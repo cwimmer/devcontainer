@@ -23,3 +23,8 @@ clean:
 test_native: Dockerfile builder
 	docker buildx build --load \
 	--tag $(CONTAINER_NAME):$(TAG) .
+
+pre-commit:
+	pre-commit install
+	pre-commit autoupdate
+	pre-commit run --all-files
