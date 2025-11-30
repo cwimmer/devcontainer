@@ -28,3 +28,8 @@ pre-commit:
 	pre-commit install
 	pre-commit autoupdate
 	pre-commit run --all-files
+
+.PHONY: upgrade
+upgrade:
+	@echo "Updating Dockerfile to latest Terraform version..."
+	./scripts/update-dockerfile.sh
