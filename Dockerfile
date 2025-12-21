@@ -31,7 +31,9 @@ ENV PATH="/root/.asdf/bin:/root/.asdf/shims:/root/.local/bin:$PATH"
 RUN asdf plugin add terraform
 RUN asdf install terraform $TERRAFORM_VERSION
 
+# Install Python-based development tools
 RUN pipx install pre-commit
+RUN pipx install commitizen  # Tool for creating Conventional Commits
 
 RUN wget https://github.com/digitalocean/doctl/releases/download/v$DOCTL_VERSION/doctl-$DOCTL_VERSION-linux-amd64.tar.gz
 RUN tar xf doctl-$DOCTL_VERSION-linux-amd64.tar.gz
