@@ -1,0 +1,51 @@
+---
+
+# Copilot Instructions for devcontainer
+
+## Project Context
+
+- This is a Docker container I use as the base for most of my devcontainers
+- It has a variety of command line tools installed.
+- The Makefile target `upgrade` upgrades the version of all components.
+- Target environment: Devcontainer
+
+## How agents should behave
+
+- Primary goals: Ensure code functions as documented.  Ensure
+    code meets quality standards outlined in README.md and/or
+    AGENTS.md.
+- Scope: Agents are welcome to change code and documentation. Prefer
+    many small changes over large, sweeping changes.
+
+## Code Style
+
+- Bash scripts should be POSIX-compliant where possible
+- Include error handling for all external calls
+- Add comments for complex logic
+- Error handling is mandatory
+- Use meaningful variable names
+- Use comments to explain complex logic
+- Keep functions small and focused
+- The project uses pre-commit hooks to apply lint rules
+- Use the string `TODO:` to indicate outstanding code, test, or
+    documentation work.  This is to support the Todo Tree extension.
+
+## Build & test commands
+
+- Use `make test` to run all tests during development iteration.
+- Development workflow - `make test`
+
+## PR / commit guidelines
+
+- Commit messages must comply with
+  [Conventional Commits v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
+- When suggesting commit messages, never use the word "comprehensive"
+
+## Priorities
+
+- Reliability and error handling
+- User experience (clear output, helpful errors)
+
+## Constraints
+
+- Must work in a devcontainer environment

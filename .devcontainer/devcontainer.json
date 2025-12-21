@@ -25,7 +25,8 @@
         "vscode": {
             "extensions": [
                 "ms-vscode.makefile-tools",
-				"redhat.vscode-yaml"
+				"redhat.vscode-yaml",
+				"DavidAnson.vscode-markdownlint"
             ]
         }
     }
