@@ -31,5 +31,45 @@ pre-commit:
 
 .PHONY: upgrade
 upgrade:
-	@echo "Updating Dockerfile to latest Terraform version..."
-	./scripts/update-dockerfile.sh
+	@echo "Updating Dockerfile to latest tool versions..."
+	@bash scripts/update-versions.sh --all
+
+.PHONY: upgrade-terraform
+upgrade-terraform:
+	@echo "Updating Terraform version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool terraform
+
+.PHONY: upgrade-golang
+upgrade-golang:
+	@echo "Updating Go version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool golang
+
+.PHONY: upgrade-kubectl
+upgrade-kubectl:
+	@echo "Updating kubectl version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool kubectl
+
+.PHONY: upgrade-tflint
+upgrade-tflint:
+	@echo "Updating tflint version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool tflint
+
+.PHONY: upgrade-trivy
+upgrade-trivy:
+	@echo "Updating trivy version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool trivy
+
+.PHONY: upgrade-terraform-docs
+upgrade-terraform-docs:
+	@echo "Updating terraform-docs version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool terraform-docs
+
+.PHONY: upgrade-doctl
+upgrade-doctl:
+	@echo "Updating doctl version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool doctl
+
+.PHONY: upgrade-asdf
+upgrade-asdf:
+	@echo "Updating asdf version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool asdf
