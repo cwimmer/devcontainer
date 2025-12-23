@@ -18,9 +18,10 @@ RUN apt-get update && apt-get install -y \
     pipx \
     jq \
     wget \
-    direnv
+    direnv \
+    golang-go
 
-RUN git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch $ASDF_VERSION
+RUN GOBIN=/usr/local/bin go install github.com/asdf-vm/asdf/cmd/asdf@$ASDF_VERSION
 
 COPY scripts/.bashrc /tmp/.bashrc
 RUN install -D -m 0755 -o root -g root /tmp/.bashrc /root/.bashrc
@@ -42,9 +43,9 @@ RUN rm doctl-$DOCTL_VERSION-linux-amd64.tar.gz doctl
 
 RUN asdf plugin add kubectl
 RUN asdf install kubectl $KUBECTL_VERSION
-RUN asdf plugin-add terraform-docs https://github.com/looztra/asdf-terraform-docs
+RUN asdf plugin add terraform-docs https://github.com/looztra/asdf-terraform-docs
 RUN asdf install terraform-docs $TERRAFORM_DOCS_VERSION
-RUN asdf plugin-add tflint https://github.com/skyzyx/asdf-tflint
+RUN asdf plugin add tflint https://github.com/skyzyx/asdf-tflint
 RUN asdf install tflint $TFLINT_VERSION
 RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
 RUN asdf install trivy $TRIVY_VERSION
