@@ -51,3 +51,8 @@ RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
 RUN asdf install trivy $TRIVY_VERSION
 RUN asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
 RUN asdf install golang $GOLANG_VERSION
+
+# Record build timestamp in an OS-release style file.
+# This creates /etc/build-info containing a single line like:
+# BUILD_DATE=2026-02-20T14:23:00+00:00
+RUN date -u --iso-8601=seconds | awk '{print "BUILD_DATE="$0}' > /etc/cwimmer-info
