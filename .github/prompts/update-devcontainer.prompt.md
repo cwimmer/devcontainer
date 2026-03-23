@@ -2,8 +2,8 @@
 description: Weekly update of the Devcontainer
 name: update-devcontainer
 agent: agent
-model: Raptor mini
-tools: ['editFiles', 'createFile']
+model: Raptor mini (Preview) (copilot)
+tools: [execute/runInTerminal, read/readFile, edit/createFile, edit/editFiles]
 ---
 # Update Devcontainer Image
 
