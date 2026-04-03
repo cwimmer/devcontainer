@@ -26,6 +26,9 @@ declare -A TOOL_ARG_NAMES=(
     ["terraform-docs"]="TERRAFORM_DOCS_VERSION"
     ["doctl"]="DOCTL_VERSION"
     ["asdf"]="ASDF_VERSION"
+    ["helm"]="HELM_VERSION"
+    ["kind"]="KIND_VERSION"
+    ["kubectx"]="KUBECTX_VERSION"
 )
 
 # Function to print colored output
@@ -146,6 +149,51 @@ get_latest_doctl_version() {
     echo "$latest_version"
 }
 
+# Function to get the latest helm version
+get_latest_helm_version() {
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/helm/helm/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest helm version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
+# Function to get the latest kind version
+get_latest_kind_version() {
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/kubernetes-sigs/kind/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest kind version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
+# Function to get the latest kubectx version
+get_latest_kubectx_version() {
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/ahmetb/kubectx/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest kubectx version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
 # Function to get the latest asdf version
 get_latest_asdf_version() {
     local latest_version
@@ -185,6 +233,15 @@ get_latest_version() {
             ;;
         doctl)
             get_latest_doctl_version
+            ;;
+        helm)
+            get_latest_helm_version
+            ;;
+        kind)
+            get_latest_kind_version
+            ;;
+        kubectx)
+            get_latest_kubectx_version
             ;;
         asdf)
             get_latest_asdf_version
@@ -322,6 +379,9 @@ SUPPORTED TOOLS:
     trivy           - Container vulnerability scanner
     terraform-docs  - Terraform documentation generator
     doctl           - DigitalOcean CLI
+    helm            - Kubernetes package manager
+    kind            - Kubernetes in Docker
+    kubectx         - Kubernetes context and namespace switcher
     asdf            - Version manager
 
 EOF
