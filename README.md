@@ -47,9 +47,16 @@ echo '.tool-versions' >> .gitignore
 Create a symlink in your home directory so asdf uses the container's
 defaults globally:
 
+> **Note:** This will overwrite any existing `~/.tool-versions`.
+
 ```sh
 ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions
 ```
+
+**Note:** The home directory is ephemeral in most devcontainers — this
+symlink is lost when the container is rebuilt. To persist it, add the
+`ln` command to your dotfiles or a `postCreateCommand` in
+`devcontainer.json`.
 
 This applies to all directories that don't have a project-level
 `.tool-versions` file.
