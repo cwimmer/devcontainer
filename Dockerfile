@@ -3,6 +3,9 @@ FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.18.1
 ARG DOCTL_VERSION=1.154.0
 ARG GOLANG_VERSION=1.26.1
+ARG HELM_VERSION=4.1.3
+ARG KIND_VERSION=0.31.0
+ARG KUBECTX_VERSION=0.11.0
 ARG KUBECTL_VERSION=1.35.3
 ARG TERRAFORM_DOCS_VERSION=0.21.0
 ARG TERRAFORM_VERSION=1.14.8
@@ -51,11 +54,20 @@ RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
 RUN asdf install trivy $TRIVY_VERSION
 RUN asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
 RUN asdf install golang $GOLANG_VERSION
+RUN asdf plugin add helm
+RUN asdf install helm $HELM_VERSION
+RUN asdf plugin add kind
+RUN asdf install kind $KIND_VERSION
+RUN asdf plugin add kubectx https://github.com/virtualstaticvoid/asdf-kubectx.git
+RUN asdf install kubectx $KUBECTX_VERSION
 
 # Write default asdf tool versions for optional use by consumers.
 # See README.md for usage instructions.
 RUN printf '%s\n' \
     "golang $GOLANG_VERSION" \
+    "helm $HELM_VERSION" \
+    "kind $KIND_VERSION" \
+    "kubectx $KUBECTX_VERSION" \
     "kubectl $KUBECTL_VERSION" \
     "terraform $TERRAFORM_VERSION" \
     "terraform-docs $TERRAFORM_DOCS_VERSION" \
