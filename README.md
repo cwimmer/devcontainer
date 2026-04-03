@@ -9,7 +9,11 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 |------|---------|
 | terraform | asdf |
 | golang | asdf |
+| helm | asdf |
+| kind | asdf |
 | kubectl | asdf |
+| kubectx | asdf |
+| kubens | asdf (via kubectx) |
 | terraform-docs | asdf |
 | tflint | asdf |
 | trivy | asdf |
