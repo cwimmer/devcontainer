@@ -8,6 +8,7 @@ test: Dockerfile builder
 	docker buildx build --load \
 	--platform linux/arm64 \
 	--tag $(CONTAINER_NAME):$(TAG) .
+	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
 
 .PHONY: builder
 builder:
@@ -23,6 +24,7 @@ clean:
 test_native: Dockerfile builder
 	docker buildx build --load \
 	--tag $(CONTAINER_NAME):$(TAG) .
+	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
 
 pre-commit:
 	pre-commit install

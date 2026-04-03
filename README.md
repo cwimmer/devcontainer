@@ -34,16 +34,25 @@ ln -s /usr/local/share/asdf-tool-versions .tool-versions
 This makes your project use the container's default versions. The
 symlink target updates automatically when the container is rebuilt.
 
-### Option 2: Environment variable
-
-Add to your shell profile or `.envrc`:
+**Note:** The symlink points into the container filesystem and will be
+broken outside the devcontainer. Add `.tool-versions` to your
+`.gitignore` to avoid committing it:
 
 ```sh
-export ASDF_TOOL_VERSIONS_FILENAME=/usr/local/share/asdf-tool-versions
+echo '.tool-versions' >> .gitignore
 ```
 
-This tells asdf to use the container's file globally without creating
-a `.tool-versions` in your project directory.
+### Option 2: Global home symlink
+
+Create a symlink in your home directory so asdf uses the container's
+defaults globally:
+
+```sh
+ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions
+```
+
+This applies to all directories that don't have a project-level
+`.tool-versions` file.
 
 ### Overriding individual tools
 
