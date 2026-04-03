@@ -52,6 +52,17 @@ RUN asdf install trivy $TRIVY_VERSION
 RUN asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
 RUN asdf install golang $GOLANG_VERSION
 
+# Write default asdf tool versions for optional use by consumers.
+# See README.md for usage instructions.
+RUN printf '%s\n' \
+    "golang $GOLANG_VERSION" \
+    "kubectl $KUBECTL_VERSION" \
+    "terraform $TERRAFORM_VERSION" \
+    "terraform-docs $TERRAFORM_DOCS_VERSION" \
+    "tflint $TFLINT_VERSION" \
+    "trivy $TRIVY_VERSION" \
+    > /usr/local/share/asdf-tool-versions
+
 # Record build timestamp in an OS-release style file.
 # This creates /etc/build-info containing a single line like:
 # BUILD_DATE=2026-02-20T14:23:00+00:00
