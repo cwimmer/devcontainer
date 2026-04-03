@@ -71,6 +71,21 @@ upgrade-doctl:
 	@echo "Updating doctl version in Dockerfile..."
 	@bash scripts/update-versions.sh --tool doctl
 
+.PHONY: upgrade-helm
+upgrade-helm:
+	@echo "Updating helm version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool helm
+
+.PHONY: upgrade-kind
+upgrade-kind:
+	@echo "Updating kind version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool kind
+
+.PHONY: upgrade-kubectx
+upgrade-kubectx:
+	@echo "Updating kubectx version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool kubectx
+
 .PHONY: upgrade-asdf
 upgrade-asdf:
 	@echo "Updating asdf version in Dockerfile..."
