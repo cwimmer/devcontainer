@@ -1,7 +1,7 @@
 ---
 description: Weekly update of the Devcontainer
 name: update-devcontainer
-model: Raptor mini (Preview) (copilot)
+model: github-copilot/gpt-5-mini
 ---
 # Update Devcontainer Image
 
