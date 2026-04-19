@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Script to update tool versions in the Dockerfile
-# Supports updating Terraform, Go, kubectl, tflint, trivy, terraform-docs, doctl, and asdf
+# Script to update tool versions in the Dockerfiles
+# Supports updating the base image tools in Dockerfile and the OpenCode
+# image tools in Dockerfile.OpenCode.
 
 set -euo pipefail
 
@@ -15,8 +16,9 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKERFILE_PATH="${SCRIPT_DIR}/../Dockerfile"
+OPENCODE_DOCKERFILE_PATH="${SCRIPT_DIR}/../Dockerfile.OpenCode"
 
-# Supported tools and their ARG names in Dockerfile
+# Supported tools and their ARG names in Dockerfiles
 declare -A TOOL_ARG_NAMES=(
     ["terraform"]="TERRAFORM_VERSION"
     ["golang"]="GOLANG_VERSION"
@@ -29,6 +31,24 @@ declare -A TOOL_ARG_NAMES=(
     ["helm"]="HELM_VERSION"
     ["kind"]="KIND_VERSION"
     ["kubectx"]="KUBECTX_VERSION"
+    ["nodejs"]="NODE_MAJOR"
+    ["opencode"]="OPENCODE_VERSION"
+)
+
+declare -A TOOL_DOCKERFILE_PATHS=(
+    ["terraform"]="$DOCKERFILE_PATH"
+    ["golang"]="$DOCKERFILE_PATH"
+    ["kubectl"]="$DOCKERFILE_PATH"
+    ["tflint"]="$DOCKERFILE_PATH"
+    ["trivy"]="$DOCKERFILE_PATH"
+    ["terraform-docs"]="$DOCKERFILE_PATH"
+    ["doctl"]="$DOCKERFILE_PATH"
+    ["asdf"]="$DOCKERFILE_PATH"
+    ["helm"]="$DOCKERFILE_PATH"
+    ["kind"]="$DOCKERFILE_PATH"
+    ["kubectx"]="$DOCKERFILE_PATH"
+    ["nodejs"]="$OPENCODE_DOCKERFILE_PATH"
+    ["opencode"]="$OPENCODE_DOCKERFILE_PATH"
 )
 
 # Function to print colored output
@@ -164,6 +184,36 @@ get_latest_helm_version() {
     echo "$latest_version"
 }
 
+# Function to get the latest Node.js major version
+get_latest_nodejs_version() {
+    local latest_version
+    latest_version=$(curl -s "https://nodejs.org/dist/index.json" | \
+                     jq -r '.[0].version' | \
+                     sed -E 's|^v([0-9]+)\..*|\1|')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest Node.js version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
+# Function to get the latest OpenCode version
+get_latest_opencode_version() {
+    local latest_version
+    latest_version=$(curl -fsSL "https://api.github.com/repos/anomalyco/opencode/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest OpenCode version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
 # Function to get the latest kind version
 get_latest_kind_version() {
     local latest_version
@@ -243,6 +293,12 @@ get_latest_version() {
         kubectx)
             get_latest_kubectx_version
             ;;
+        nodejs)
+            get_latest_nodejs_version
+            ;;
+        opencode)
+            get_latest_opencode_version
+            ;;
         asdf)
             get_latest_asdf_version
             ;;
@@ -253,16 +309,34 @@ get_latest_version() {
     esac
 }
 
+# Function to get the Dockerfile path for a tool
+get_dockerfile_path() {
+    local tool="$1"
+    local dockerfile_path
+
+    dockerfile_path="${TOOL_DOCKERFILE_PATHS[$tool]:-}"
+
+    if [[ -z "$dockerfile_path" ]]; then
+        print_error "No Dockerfile mapping found for tool: $tool"
+        return 1
+    fi
+
+    echo "$dockerfile_path"
+}
+
 # Function to get current version from Dockerfile
 get_current_version() {
     local tool="$1"
     local arg_name="${TOOL_ARG_NAMES[$tool]}"
+    local dockerfile_path
     local current_version
+
+    dockerfile_path=$(get_dockerfile_path "$tool") || return 1
     
-    current_version=$(grep "^ARG ${arg_name}=" "$DOCKERFILE_PATH" | cut -d'=' -f2)
+    current_version=$(grep "^ARG ${arg_name}=" "$dockerfile_path" | cut -d'=' -f2)
     
     if [[ -z "$current_version" ]]; then
-        print_error "Could not find ${arg_name} in Dockerfile"
+        print_error "Could not find ${arg_name} in $(basename "$dockerfile_path")"
         return 1
     fi
     
@@ -276,17 +350,20 @@ update_version() {
     local current_version="$3"
     local no_backup="$4"
     local arg_name="${TOOL_ARG_NAMES[$tool]}"
+    local dockerfile_path
+
+    dockerfile_path=$(get_dockerfile_path "$tool") || return 1
     
-    print_info "Updating $tool version in Dockerfile from $current_version to $new_version..."
+    print_info "Updating $tool version in $(basename "$dockerfile_path") from $current_version to $new_version..."
     
     # Create a backup unless disabled
     if [[ "$no_backup" != "true" ]]; then
-        cp "$DOCKERFILE_PATH" "${DOCKERFILE_PATH}.backup"
-        print_info "Created backup: ${DOCKERFILE_PATH}.backup"
+        cp "$dockerfile_path" "${dockerfile_path}.backup"
+        print_info "Created backup: ${dockerfile_path}.backup"
     fi
     
     # Update the Dockerfile
-    sed -i "s|^ARG ${arg_name}=.*|ARG ${arg_name}=$new_version|" "$DOCKERFILE_PATH"
+    sed -i "s|^ARG ${arg_name}=.*|ARG ${arg_name}=$new_version|" "$dockerfile_path"
     
     # Verify the change
     local updated_version
@@ -295,12 +372,12 @@ update_version() {
     if [[ "$updated_version" == "$new_version" ]]; then
         print_success "Successfully updated $tool version from $current_version to $new_version"
         if [[ "$no_backup" != "true" ]]; then
-            print_info "Backup created at: ${DOCKERFILE_PATH}.backup"
+            print_info "Backup created at: ${dockerfile_path}.backup"
         fi
     else
         print_error "Failed to update $tool version. Restoring backup..."
         if [[ "$no_backup" != "true" ]]; then
-            mv "${DOCKERFILE_PATH}.backup" "$DOCKERFILE_PATH"
+            mv "${dockerfile_path}.backup" "$dockerfile_path"
         fi
         return 1
     fi
@@ -318,7 +395,7 @@ process_tool() {
     # Get current version
     local current_version
     current_version=$(get_current_version "$tool") || return 1
-    print_info "Current $tool version in Dockerfile: $current_version"
+    print_info "Current $tool version: $current_version"
     
     # Get target version (latest or specific)
     local target_version
@@ -354,7 +431,7 @@ show_help() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Update tool versions in the Dockerfile.
+Update tool versions in the Dockerfiles.
 
 OPTIONS:
     -h, --help              Show this help message
@@ -370,6 +447,7 @@ EXAMPLES:
     $0 --all                            # Update all tools to latest
     $0 --all --check-only               # Check for updates without applying
     $0 --tool kubectl --no-backup       # Update without creating backup
+    $0 --tool opencode                  # Update OpenCode in Dockerfile.OpenCode
 
 SUPPORTED TOOLS:
     terraform       - HashiCorp Terraform
@@ -382,6 +460,8 @@ SUPPORTED TOOLS:
     helm            - Kubernetes package manager
     kind            - Kubernetes in Docker
     kubectx         - Kubernetes context and namespace switcher
+    nodejs          - Node.js major version for Dockerfile.OpenCode
+    opencode        - OpenCode version for Dockerfile.OpenCode
     asdf            - Version manager
 
 EOF
@@ -458,10 +538,25 @@ main() {
         exit 1
     fi
     
-    # Check if Dockerfile exists
-    if [[ ! -f "$DOCKERFILE_PATH" ]]; then
-        print_error "Dockerfile not found at: $DOCKERFILE_PATH"
-        exit 1
+    # Check if required Dockerfiles exist
+    if [[ "$UPDATE_ALL" == "true" ]]; then
+        if [[ ! -f "$DOCKERFILE_PATH" ]]; then
+            print_error "Dockerfile not found at: $DOCKERFILE_PATH"
+            exit 1
+        fi
+
+        if [[ ! -f "$OPENCODE_DOCKERFILE_PATH" ]]; then
+            print_error "Dockerfile.OpenCode not found at: $OPENCODE_DOCKERFILE_PATH"
+            exit 1
+        fi
+    elif [[ -n "$TOOL" ]]; then
+        local dockerfile_path
+        dockerfile_path=$(get_dockerfile_path "$TOOL") || exit 1
+
+        if [[ ! -f "$dockerfile_path" ]]; then
+            print_error "Required Dockerfile not found at: $dockerfile_path"
+            exit 1
+        fi
     fi
     
     # Check if required tools are available

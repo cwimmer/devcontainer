@@ -1,6 +1,7 @@
 {
     "chat.tools.terminal.autoApprove": {
         "git rev-parse": true,
-        "env": true
+        "env": true,
+        "./tests/test-opencode-support.sh": true
     }
 }

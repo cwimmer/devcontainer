@@ -33,11 +33,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-architecture image
+      - name: Build and push base multi-architecture image
         uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/cwimmer/devcontainer:latest
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push OpenCode multi-architecture image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.OpenCode
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/cwimmer/devcontainer:opencode
           platforms: linux/amd64,linux/arm64

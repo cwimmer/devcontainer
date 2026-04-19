@@ -1,2 +1,3 @@
-# Backup files created by update-dockerfile.sh
+# Backup files created by update-versions.sh
 Dockerfile.backup
+Dockerfile.OpenCode.backup

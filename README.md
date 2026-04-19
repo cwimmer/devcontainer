@@ -6,7 +6,7 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 ## Installed tools
 
 | Tool | Manager |
-|------|---------|
+| ---- | ------- |
 | terraform | asdf |
 | golang | asdf |
 | helm | asdf |
@@ -20,6 +20,9 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 | doctl | binary |
 | pre-commit | pipx |
 | commitizen | pipx |
+
+The published `ghcr.io/cwimmer/devcontainer:opencode` image layers
+Node.js and OpenCode on top of the base tool set.
 
 ## Using default tool versions
 
@@ -83,7 +86,9 @@ Then edit the version for the tool you want to change.
 
 ```sh
 make test          # multi-platform build (amd64 + arm64)
+make test_opencode # multi-platform OpenCode image build (amd64 + arm64)
 make test_native   # native platform only (faster)
+make test_native_opencode # native OpenCode image build (faster)
 ```
 
 ### Upgrading tool versions
