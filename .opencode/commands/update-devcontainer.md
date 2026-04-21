@@ -32,3 +32,4 @@ model: github-copilot/gpt-5-mini
 
 - Always validate the result by checking `git status --short` and `git diff -- Dockerfile Dockerfile.OpenCode`.
 - Keep the final summary short and actionable.
+- The `test_native` and `test_native_opencode` targets take a long time to run.  Don't use your default timeout.  Set the timeout for those tasks to at least 20 minutes.
