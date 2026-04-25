@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.18.1
+ARG BATS_VERSION=1.13.0
 ARG DOCTL_VERSION=1.155.0
 ARG GOLANG_VERSION=1.26.2
 ARG HELM_VERSION=4.1.4
@@ -54,6 +55,8 @@ RUN asdf plugin add trivy https://github.com/zufardhiyaulhaq/asdf-trivy.git
 RUN asdf install trivy $TRIVY_VERSION
 RUN asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
 RUN asdf install golang $GOLANG_VERSION
+RUN asdf plugin add bats https://github.com/timgluz/asdf-bats.git
+RUN asdf install bats $BATS_VERSION
 RUN asdf plugin add helm
 RUN asdf install helm $HELM_VERSION
 RUN asdf plugin add kind
@@ -65,6 +68,7 @@ RUN asdf install kubectx $KUBECTX_VERSION
 # See README.md for usage instructions.
 RUN printf '%s\n' \
     "golang $GOLANG_VERSION" \
+    "bats $BATS_VERSION" \
     "helm $HELM_VERSION" \
     "kind $KIND_VERSION" \
     "kubectx $KUBECTX_VERSION" \

@@ -9,6 +9,7 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 | ---- | ------- |
 | terraform | asdf |
 | golang | asdf |
+| bats | asdf |
 | helm | asdf |
 | kind | asdf |
 | kubectl | asdf |
@@ -26,9 +27,15 @@ Node.js and OpenCode on top of the base tool set.
 
 ## Using default tool versions
 
-The container ships a `.tool-versions`-compatible file at
-`/usr/local/share/asdf-tool-versions` containing the default versions
-of all asdf-managed tools.
+The image installs all asdf-managed tools and ships a
+`.tool-versions`-compatible file at
+`/usr/local/share/asdf-tool-versions` containing their default
+versions. Those tools become active when asdf finds a
+`.tool-versions` file in the current directory or home directory.
+
+For ad hoc `docker run` checks, the supported path is to link
+`/usr/local/share/asdf-tool-versions` to `~/.tool-versions` before
+invoking the tool.
 
 You can adopt these defaults in your project using either method:
 
@@ -96,3 +103,8 @@ make test_native_opencode # native OpenCode image build (faster)
 ```sh
 make upgrade       # update all tools to latest versions
 ```
+
+When adding a new asdf-managed tool to this repository, update these
+together: `Dockerfile`, the `/usr/local/share/asdf-tool-versions`
+block in `Dockerfile`, `scripts/update-versions.sh`, `Makefile`,
+`README.md`, and any related smoke tests.

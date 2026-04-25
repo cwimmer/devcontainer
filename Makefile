@@ -12,6 +12,8 @@ test: Dockerfile builder
 	--platform linux/arm64 \
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
+	docker run --rm $(CONTAINER_NAME):$(TAG) sh -lc 'ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions && bats --version'
+	./tests/test-bats-support.sh
 
 .PHONY: test_opencode
 test_opencode: $(OPENCODE_DOCKERFILE) builder test
@@ -41,6 +43,8 @@ test_native: Dockerfile builder
 	docker buildx build --load \
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
+	docker run --rm $(CONTAINER_NAME):$(TAG) sh -lc 'ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions && bats --version'
+	./tests/test-bats-support.sh
 
 .PHONY: test_native_opencode
 test_native_opencode: $(OPENCODE_DOCKERFILE) builder test_native
@@ -94,6 +98,11 @@ upgrade-terraform-docs:
 upgrade-doctl:
 	@echo "Updating doctl version in Dockerfile..."
 	@bash scripts/update-versions.sh --tool doctl
+
+.PHONY: upgrade-bats
+upgrade-bats:
+	@echo "Updating bats version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool bats
 
 .PHONY: upgrade-helm
 upgrade-helm:

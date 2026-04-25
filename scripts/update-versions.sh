@@ -28,6 +28,7 @@ declare -A TOOL_ARG_NAMES=(
     ["terraform-docs"]="TERRAFORM_DOCS_VERSION"
     ["doctl"]="DOCTL_VERSION"
     ["asdf"]="ASDF_VERSION"
+    ["bats"]="BATS_VERSION"
     ["helm"]="HELM_VERSION"
     ["kind"]="KIND_VERSION"
     ["kubectx"]="KUBECTX_VERSION"
@@ -44,6 +45,7 @@ declare -A TOOL_DOCKERFILE_PATHS=(
     ["terraform-docs"]="$DOCKERFILE_PATH"
     ["doctl"]="$DOCKERFILE_PATH"
     ["asdf"]="$DOCKERFILE_PATH"
+    ["bats"]="$DOCKERFILE_PATH"
     ["helm"]="$DOCKERFILE_PATH"
     ["kind"]="$DOCKERFILE_PATH"
     ["kubectx"]="$DOCKERFILE_PATH"
@@ -165,7 +167,22 @@ get_latest_doctl_version() {
         print_error "Failed to fetch the latest doctl version"
         return 1
     fi
-    
+
+    echo "$latest_version"
+}
+
+# Function to get the latest Bats version
+get_latest_bats_version() {
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/bats-core/bats-core/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest Bats version"
+        return 1
+    fi
+
     echo "$latest_version"
 }
 
@@ -283,6 +300,9 @@ get_latest_version() {
             ;;
         doctl)
             get_latest_doctl_version
+            ;;
+        bats)
+            get_latest_bats_version
             ;;
         helm)
             get_latest_helm_version
@@ -457,6 +477,7 @@ SUPPORTED TOOLS:
     trivy           - Container vulnerability scanner
     terraform-docs  - Terraform documentation generator
     doctl           - DigitalOcean CLI
+    bats            - Bash Automated Testing System
     helm            - Kubernetes package manager
     kind            - Kubernetes in Docker
     kubectx         - Kubernetes context and namespace switcher
