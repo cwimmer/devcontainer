@@ -2,7 +2,7 @@ FROM ghcr.io/cwimmer/devcontainer:latest
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG NODE_MAJOR=26
-ARG OPENCODE_VERSION=1.15.4
+ARG OPENCODE_VERSION=1.15.10
 
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
