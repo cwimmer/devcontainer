@@ -23,7 +23,12 @@ RUN apt-get update && apt-get install -y \
     jq \
     wget \
     direnv \
-    golang-go
+    golang-go \
+    httpie \
+    iproute2 \
+    iputils-ping \
+    socat \
+    dnsutils
 
 RUN GOBIN=/usr/local/bin go install github.com/asdf-vm/asdf/cmd/asdf@$ASDF_VERSION
 
