@@ -28,7 +28,8 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     iputils-ping \
     socat \
-    dnsutils
+    dnsutils \
+    ripgrep
 
 RUN GOBIN=/usr/local/bin go install github.com/asdf-vm/asdf/cmd/asdf@$ASDF_VERSION
 
