@@ -27,6 +27,7 @@ declare -A TOOL_ARG_NAMES=(
     ["trivy"]="TRIVY_VERSION"
     ["terraform-docs"]="TERRAFORM_DOCS_VERSION"
     ["doctl"]="DOCTL_VERSION"
+    ["gh"]="GH_VERSION"
     ["asdf"]="ASDF_VERSION"
     ["bats"]="BATS_VERSION"
     ["helm"]="HELM_VERSION"
@@ -44,6 +45,7 @@ declare -A TOOL_DOCKERFILE_PATHS=(
     ["trivy"]="$DOCKERFILE_PATH"
     ["terraform-docs"]="$DOCKERFILE_PATH"
     ["doctl"]="$DOCKERFILE_PATH"
+    ["gh"]="$DOCKERFILE_PATH"
     ["asdf"]="$DOCKERFILE_PATH"
     ["bats"]="$DOCKERFILE_PATH"
     ["helm"]="$DOCKERFILE_PATH"
@@ -165,6 +167,21 @@ get_latest_doctl_version() {
     
     if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
         print_error "Failed to fetch the latest doctl version"
+        return 1
+    fi
+
+    echo "$latest_version"
+}
+
+# Function to get the latest GitHub CLI version
+get_latest_gh_version() {
+    local latest_version
+    latest_version=$(curl -s "https://api.github.com/repos/cli/cli/releases/latest" | \
+                     jq -r '.tag_name' | \
+                     sed 's|^v||')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        print_error "Failed to fetch the latest GitHub CLI version"
         return 1
     fi
 
@@ -300,6 +317,9 @@ get_latest_version() {
             ;;
         doctl)
             get_latest_doctl_version
+            ;;
+        gh)
+            get_latest_gh_version
             ;;
         bats)
             get_latest_bats_version
@@ -477,6 +497,7 @@ SUPPORTED TOOLS:
     trivy           - Container vulnerability scanner
     terraform-docs  - Terraform documentation generator
     doctl           - DigitalOcean CLI
+    gh              - GitHub CLI
     bats            - Bash Automated Testing System
     helm            - Kubernetes package manager
     kind            - Kubernetes in Docker

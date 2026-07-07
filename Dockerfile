@@ -2,16 +2,17 @@
 FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.19.0
 ARG BATS_VERSION=1.13.0
-ARG DOCTL_VERSION=1.161.0
+ARG DOCTL_VERSION=1.162.0
+ARG GH_VERSION=2.96.0
 ARG GOLANG_VERSION=1.26.4
-ARG HELM_VERSION=4.2.1
+ARG HELM_VERSION=4.2.2
 ARG KIND_VERSION=0.32.0
 ARG KUBECTX_VERSION=0.11.0
 ARG KUBECTL_VERSION=1.36.2
 ARG TERRAFORM_DOCS_VERSION=0.24.0
 ARG TERRAFORM_VERSION=1.15.6
 ARG TFLINT_VERSION=0.63.1
-ARG TRIVY_VERSION=0.71.0
+ARG TRIVY_VERSION=0.71.1
 
 RUN apt-get update && apt-get install -y \
     unzip \
@@ -30,6 +31,15 @@ RUN apt-get update && apt-get install -y \
     socat \
     dnsutils \
     ripgrep
+
+RUN install -d -m 0755 /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y gh=$GH_VERSION
 
 RUN GOBIN=/usr/local/bin go install github.com/asdf-vm/asdf/cmd/asdf@$ASDF_VERSION
 

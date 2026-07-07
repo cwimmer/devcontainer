@@ -19,6 +19,7 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 | tflint | asdf |
 | trivy | asdf |
 | doctl | binary |
+| gh | apt |
 | pre-commit | pipx |
 | commitizen | pipx |
 

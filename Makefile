@@ -13,7 +13,9 @@ test: Dockerfile builder
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
 	docker run --rm $(CONTAINER_NAME):$(TAG) sh -lc 'ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions && bats --version'
+	docker run --rm $(CONTAINER_NAME):$(TAG) gh --version
 	./tests/test-bats-support.sh
+	./tests/test-gh-support.sh
 
 .PHONY: test_opencode
 test_opencode: $(OPENCODE_DOCKERFILE) builder test
@@ -44,7 +46,9 @@ test_native: Dockerfile builder
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
 	docker run --rm $(CONTAINER_NAME):$(TAG) sh -lc 'ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions && bats --version'
+	docker run --rm $(CONTAINER_NAME):$(TAG) gh --version
 	./tests/test-bats-support.sh
+	./tests/test-gh-support.sh
 
 .PHONY: test_native_opencode
 test_native_opencode: $(OPENCODE_DOCKERFILE) builder test_native
@@ -98,6 +102,11 @@ upgrade-terraform-docs:
 upgrade-doctl:
 	@echo "Updating doctl version in Dockerfile..."
 	@bash scripts/update-versions.sh --tool doctl
+
+.PHONY: upgrade-gh
+upgrade-gh:
+	@echo "Updating GitHub CLI version in Dockerfile..."
+	@bash scripts/update-versions.sh --tool gh
 
 .PHONY: upgrade-bats
 upgrade-bats:
