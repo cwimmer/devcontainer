@@ -2,6 +2,8 @@
 FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.20.0
 ARG BATS_VERSION=1.14.0
+ARG BATS_ASSERT_VERSION=2.1.0
+ARG BATS_SUPPORT_VERSION=0.3.0
 ARG DOCTL_VERSION=1.168.0
 ARG GH_VERSION=2.100.0
 ARG GOLANG_VERSION=1.27.1
@@ -79,6 +81,12 @@ RUN asdf plugin add kind
 RUN asdf install kind $KIND_VERSION
 RUN asdf plugin add kubectx https://github.com/virtualstaticvoid/asdf-kubectx.git
 RUN asdf install kubectx $KUBECTX_VERSION
+
+# BATS helper libraries (loaded from /usr/local/share/bats-{support,assert} by .bats tests)
+RUN git clone --depth 1 --branch v$BATS_SUPPORT_VERSION \
+        https://github.com/bats-core/bats-support.git /usr/local/share/bats-support
+RUN git clone --depth 1 --branch v$BATS_ASSERT_VERSION \
+        https://github.com/bats-core/bats-assert.git /usr/local/share/bats-assert
 
 # Write default asdf tool versions for optional use by consumers.
 # See README.md for usage instructions.
