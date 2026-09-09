@@ -118,7 +118,14 @@ No other shared abstraction unless three or more tests need it
 
 ### 3. `tests/test-bats-support.bats`
 
-Translates the 6 assertions of `tests/test-bats-support.sh` 1:1:
+Translates the 6 assertions of `tests/test-bats-support.sh` 1:1, with
+one substitution noted below:
+
+The original's static `RUN asdf install bats $BATS_VERSION` line
+check is replaced by a dynamic `update-versions.sh --tool bats
+--check-only` invocation. This exercises more of the upgrade
+workflow but is no longer a literal 1:1 translation of the original
+assertion.
 
 ```bash
 #!/usr/bin/env bats
@@ -169,7 +176,9 @@ style; the bats files mirror it.
 Translates the 5 assertions of `tests/test-gh-support.sh` 1:1. Same
 shape as section 3 with `gh` substituted. The grep pattern for the
 apt-install line uses `"apt-get install -y gh=\$GH_VERSION"` (double
-quotes, escaped `$`) for the same reason.
+quotes, escaped `$`) for the same reason. The original script had a
+sixth assertion checking for `ARG GH_VERSION=`, which was dropped as
+redundant with the apt-install-line check that was kept.
 
 ### 5. `tests/test-opencode-support.bats`
 
@@ -235,10 +244,14 @@ Extend the existing hook:
         args: [-x]
 ```
 
-`files:` makes the hook match `.bats` files (pre-commit's type detector
-does not classify `.bats` as shell). `args: [-x]` follows `load`
-directives so SC1091 warnings are not raised for
-`load '/usr/local/share/bats-support/load'` and friends.
+The primary change is the `files:` regex, which makes the hook match
+`.bats` files (pre-commit's type detector does not classify `.bats` as
+shell, so shellcheck was previously skipping them entirely). The
+`args: [-x]` is mostly a no-op for the `.bats` files themselves —
+shellcheck does not recognize bats's `load` as a shell directive — but
+it does follow `source` directives inside the loaded helper libraries
+(e.g. `bats-support/load.bash` and `bats-assert/load.bash`), which use
+`source` to pull in additional files.
 
 ### 8. `.github/workflows/image-build.yaml`
 
