@@ -226,7 +226,7 @@ load '/usr/local/share/bats-assert/load'
 Run:
 
 ```bash
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-bats-support.bats
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-bats-support.bats
 ```
 
 Expected: 6 tests, all pass. Output includes `1..6` plan line and `ok N` for each test.
@@ -237,7 +237,7 @@ Temporarily break the test by inserting an obvious failure. Run:
 
 ```bash
 sed -i 's|"ARG BATS_VERSION="|"ARG BATS_VERSION=THIS_DOES_NOT_EXIST"|' tests/test-bats-support.bats
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-bats-support.bats
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-bats-support.bats
 ```
 
 Expected: at least one test fails with a message indicating the missing substring, e.g. `grep ... No such file or directory` or a non-zero status from the `run` invocation. The failing `@test` name must be visible in the output.
@@ -305,7 +305,7 @@ load '/usr/local/share/bats-assert/load'
 Run:
 
 ```bash
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-gh-support.bats
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-gh-support.bats
 ```
 
 Expected: 5 tests, all pass.
@@ -392,7 +392,7 @@ load '/usr/local/share/bats-assert/load'
 Run:
 
 ```bash
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-opencode-support.bats
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-opencode-support.bats
 ```
 
 Expected: 10 tests, all pass.
@@ -403,7 +403,7 @@ Temporarily change `assert_output "2"` to `assert_output "99"` and confirm the t
 
 ```bash
 sed -i 's|assert_output "2"|assert_output "99"|' tests/test-opencode-support.bats
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-opencode-support.bats
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-opencode-support.bats
 ```
 
 Expected: the count test fails with output showing actual vs expected values.
@@ -441,8 +441,16 @@ In `Makefile`, replace this block (lines 17–18):
 with:
 
 ```makefile
-	docker run --rm -v $(CURDIR)/tests:/tests -w /tests $(CONTAINER_NAME):$(TAG) bats tests/*.bats
+	docker run --rm -e ASDF_BATS_VERSION=$$(grep '^ARG BATS_VERSION=' Dockerfile | cut -d= -f2) \
+		-v $(CURDIR):/repo -w /repo/tests \
+		$(CONTAINER_NAME):$(TAG) \
+		bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
 ```
+
+The double-`$$` is required because Make passes the shell a literal
+`$` for command substitution; the inner grep then extracts the
+pinned `BATS_VERSION` from the `Dockerfile` so the env var matches
+the value baked into the image.
 
 - [ ] **Step 2: Update the `test_native:` target**
 
@@ -453,7 +461,7 @@ In `Makefile`, replace this block (lines 50–51):
 	./tests/test-gh-support.sh
 ```
 
-with the same `docker run ... bats tests/*.bats` line as in Step 1.
+with the same `docker run ... bats ...` invocation as in Step 1.
 
 - [ ] **Step 3: Verify `make -n test_native` shows the new command**
 
@@ -463,7 +471,7 @@ Run:
 make -n test_native
 ```
 
-Expected: the dry-run output contains `docker run --rm -v ... bats tests/*.bats` and **does not** contain `./tests/test-bats-support.sh` or `./tests/test-gh-support.sh`.
+Expected: the dry-run output contains `docker run --rm -e ASDF_BATS_VERSION=... -v $(CURDIR):/repo -w /repo/tests ... bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats` and **does not** contain `./tests/test-bats-support.sh` or `./tests/test-gh-support.sh`.
 
 - [ ] **Step 4: Verify the Makefile change lints clean**
 
@@ -578,10 +586,11 @@ Append this job at the end of the `jobs:` block (after the existing `build:` job
       - name: Run BATS suite inside the built image
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}/tests:/tests \
-            -w /tests \
+            -e ASDF_BATS_VERSION=1.14.0 \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo/tests \
             ghcr.io/cwimmer/devcontainer:latest \
-            bats tests/*.bats
+            bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
 ```
 
 - [ ] **Step 3: Validate the workflow YAML locally**
@@ -729,8 +738,9 @@ git commit -m "test: remove superseded bash test scripts"
 Run:
 
 ```bash
-docker buildx build --load --platform linux/amd64 --tag ghcr.io/cwimmer/devcontainer:latest .
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/*.bats
+HOST_ARCH="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+docker buildx build --load --platform "linux/${HOST_ARCH}" --tag ghcr.io/cwimmer/devcontainer:latest .
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
 ```
 
 Expected: 21 `@test` blocks total (6 + 5 + 10), all pass.
@@ -761,8 +771,9 @@ Run:
 
 ```bash
 sed -i 's|ARG BATS_VERSION=1.14.0|ARG BATS_VERSION=999.0.0|' Dockerfile
-docker buildx build --load --platform linux/amd64 --tag ghcr.io/cwimmer/devcontainer:latest . >/dev/null 2>&1 || true
-docker run --rm -v "$(pwd)/tests:/tests" -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/test-bats-support.bats 2>&1 | head -30
+HOST_ARCH="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+docker buildx build --load --platform "linux/${HOST_ARCH}" --tag ghcr.io/cwimmer/devcontainer:latest . >/dev/null 2>&1 || true
+docker run --rm -e ASDF_BATS_VERSION=1.14.0 -v "$(pwd):/repo" -w /repo/tests ghcr.io/cwimmer/devcontainer:latest bats test-bats-support.bats 2>&1 | head -30
 ```
 
 Expected: at least one test fails; the failing `@test` name is visible; the diagnostic references the missing substring.
@@ -771,7 +782,8 @@ Then revert:
 
 ```bash
 git checkout -- Dockerfile
-docker buildx build --load --platform linux/amd64 --tag ghcr.io/cwimmer/devcontainer:latest .
+HOST_ARCH="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+docker buildx build --load --platform "linux/${HOST_ARCH}" --tag ghcr.io/cwimmer/devcontainer:latest .
 ```
 
 - [ ] **Step 5: Inspect `git status --short` for unintended changes**

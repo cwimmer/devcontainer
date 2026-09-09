@@ -43,8 +43,12 @@ assertions were actually run. Migrating to BATS:
    are git-tagged libraries, not GitHub-released binaries, so they do
    not get added to `scripts/update-versions.sh`.
 3. Run the BATS suite from the host by `docker run`-ing the built
-   image with `tests/` bind-mounted in: `docker run --rm -v
-   $(CURDIR)/tests:/tests -w /tests <image> bats tests/*.bats`.
+   image with the whole repo bind-mounted in: `docker run --rm -e
+   ASDF_BATS_VERSION=$(BATS_VERSION) -v $(CURDIR):/repo -w /repo/tests
+   <image> bats test-bats-support.bats test-gh-support.bats
+   test-opencode-support.bats`. The full-repo mount is required
+   because `tests/test_helper/common.bash` resolves `REPO_ROOT` from
+   `BATS_TEST_DIRNAME`'s parent.
 4. Extend the existing `shellcheck-py` pre-commit hook so it also
    lints `.bats` files and follows `load` directives.
 5. Add a `test` job to `.github/workflows/image-build.yaml` that builds
@@ -114,7 +118,7 @@ No other shared abstraction unless three or more tests need it
 
 ### 3. `tests/test-bats-support.bats`
 
-Translates the 5 assertions of `tests/test-bats-support.sh` 1:1:
+Translates the 6 assertions of `tests/test-bats-support.sh` 1:1:
 
 ```bash
 #!/usr/bin/env bats
@@ -143,8 +147,8 @@ load '/usr/local/share/bats-assert/load'
     assert_success
 }
 
-@test "Dockerfile includes bats in asdf-tool-versions" {
-    run grep -Fq -- '"bats $BATS_VERSION" \\' "$REPO_ROOT/Dockerfile"
+@test "Dockerfile includes bats in asdf-tool-versions generation" {
+    run grep -Fq -- "\"bats \$BATS_VERSION\" \\" "$REPO_ROOT/Dockerfile"
     assert_success
 }
 
@@ -154,16 +158,24 @@ load '/usr/local/share/bats-assert/load'
 }
 ```
 
+Note: grep patterns that contain shell metacharacters (`$`,
+backslashes) are written with **double quotes and escaped `$`** so
+that shellcheck does not flag SC2016 and the test passes through the
+pre-commit hook. The original `.sh` tests used the same encoding
+style; the bats files mirror it.
+
 ### 4. `tests/test-gh-support.bats`
 
 Translates the 5 assertions of `tests/test-gh-support.sh` 1:1. Same
-shape as above with `gh` substituted.
+shape as section 3 with `gh` substituted. The grep pattern for the
+apt-install line uses `"apt-get install -y gh=\$GH_VERSION"` (double
+quotes, escaped `$`) for the same reason.
 
 ### 5. `tests/test-opencode-support.bats`
 
-Translates the 7 assertions of `tests/test-opencode-support.sh` 1:1.
-Uses `assert_output "2"` for the `--platform linux/arm64 \\` count
-assertion:
+Translates the 10 assertions of `tests/test-opencode-support.sh`
+1:1. Uses `assert_output "2"` for the `--platform linux/arm64 \\`
+count assertion:
 
 ```bash
 @test "Makefile targets linux/arm64 platform twice" {
@@ -171,6 +183,9 @@ assertion:
     assert_output "2"
 }
 ```
+
+The `$(CONTAINER_NAME):$(OPENCODE_TAG)` Makefile patterns use the
+same double-quoted, escaped-`$` encoding as section 3.
 
 ### 6. `Makefile`
 
@@ -184,8 +199,24 @@ In `test:` and `test_native:`, replace:
 with:
 
 ```makefile
-docker run --rm -v $(CURDIR)/tests:/tests -w /tests $(CONTAINER_NAME):$(TAG) bats tests/*.bats
+docker run --rm -e ASDF_BATS_VERSION=$(BATS_VERSION) \
+    -v $(CURDIR):/repo -w /repo/tests \
+    $(CONTAINER_NAME):$(TAG) \
+    bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
 ```
+
+Notes on this invocation:
+
+- The container mount must include the **whole repo** (`/repo`), not
+  only `tests/`, because `tests/test_helper/common.bash` resolves
+  `REPO_ROOT` from `BATS_TEST_DIRNAME`'s parent (the repo root).
+- `ASDF_BATS_VERSION=$(BATS_VERSION)` is needed so the asdf bats
+  shim (installed via `Dockerfile:75`) finds a version — the existing
+  `Makefile` works around this by `sh -lc`-symlinking
+  `/usr/local/share/asdf-tool-versions` to `~/.tool-versions`; passing
+  the env var directly is the simpler equivalent.
+- bats takes one or more file arguments; passing three files runs the
+  three suites sequentially in a single container.
 
 (`test_opencode:` and `test_native_opencode:` do not invoke any tests
 today and are not changed; their wiring is asserted by
@@ -241,10 +272,11 @@ The new `test` job consumes the loaded image and runs the suite:
       - name: Run BATS suite inside the built image
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}/tests:/tests \
-            -w /tests \
+            -e ASDF_BATS_VERSION=1.14.0 \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo/tests \
             ghcr.io/cwimmer/devcontainer:latest \
-            bats tests/*.bats
+            bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
 ```
 
 This avoids the duplicate build that would otherwise happen because
@@ -290,9 +322,16 @@ in CI, delete:
 
 ## Verification plan
 
-1. Run the new bats suite directly: `docker run --rm -v $(pwd)/tests:/tests
-   -w /tests ghcr.io/cwimmer/devcontainer:latest bats tests/*.bats`.
-   Expected: every `@test` passes.
+1. Run the new bats suite directly:
+
+   ```bash
+   docker run --rm -e ASDF_BATS_VERSION=1.14.0 \
+     -v "$(pwd):/repo" -w /repo/tests \
+     ghcr.io/cwimmer/devcontainer:latest \
+     bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
+   ```
+
+   Expected: 21 `@test` blocks pass.
 2. Run `make test_native`. Expected: image builds, bats version
    reports present, BATS suite passes.
 3. Run `make pre-commit`. Expected: shellcheck lints the new `.bats`
