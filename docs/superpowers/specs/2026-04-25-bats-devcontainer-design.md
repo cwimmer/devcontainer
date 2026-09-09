@@ -162,3 +162,12 @@ Out of scope:
 ## Expected Outcome
 
 After implementation, `bats` will be available in the base devcontainer image and in the OpenCode variant via inheritance. Its version will be pinned and upgradeable through the same repo workflow used for the existing asdf-managed tools, and the README will explicitly document the maintenance pattern future agents should follow when adding similar tools.
+
+## Follow-up: BATS test framework migration (2026-09-08)
+
+The smoke test introduced in this design (`tests/test-bats-support.sh`)
+was migrated to BATS as part of
+`docs/superpowers/specs/2026-09-08-bats-test-migration-design.md`.
+The bash assertion helpers were replaced with `bats-assert`; the test
+itself is now `tests/test-bats-support.bats` and is run by `make
+test_native` (and CI) inside the devcontainer image.
