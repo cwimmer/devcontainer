@@ -99,6 +99,14 @@ make test_native   # native platform only (faster)
 make test_native_opencode # native OpenCode image build (faster)
 ```
 
+### Testing
+
+The BATS test suite lives in `tests/test-*.bats` and asserts that the
+devcontainer's tooling, upgrade workflow, and OpenCode wiring stay
+consistent. Run `make test` for the multi-platform build or
+`make test_native` for the faster native build; both invoke the suite
+inside the freshly built devcontainer image.
+
 ### Upgrading tool versions
 
 ```sh
