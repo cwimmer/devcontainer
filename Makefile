@@ -17,7 +17,8 @@ test: Dockerfile builder
 	docker run --rm -e ASDF_BATS_VERSION=$$(grep '^ARG BATS_VERSION=' Dockerfile | cut -d= -f2) \
 		-v $(CURDIR):/repo -w /repo/tests \
 		$(CONTAINER_NAME):$(TAG) \
-		bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
+		bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats \
+		     test-file-support.bats
 
 .PHONY: test_opencode
 test_opencode: $(OPENCODE_DOCKERFILE) builder test
@@ -52,7 +53,8 @@ test_native: Dockerfile builder
 	docker run --rm -e ASDF_BATS_VERSION=$$(grep '^ARG BATS_VERSION=' Dockerfile | cut -d= -f2) \
 		-v $(CURDIR):/repo -w /repo/tests \
 		$(CONTAINER_NAME):$(TAG) \
-		bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats
+		bats test-bats-support.bats test-gh-support.bats test-opencode-support.bats \
+		     test-file-support.bats
 
 .PHONY: test_native_opencode
 test_native_opencode: $(OPENCODE_DOCKERFILE) builder test_native
