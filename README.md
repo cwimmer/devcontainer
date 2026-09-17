@@ -20,6 +20,7 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 | trivy | asdf |
 | doctl | binary |
 | gh | apt |
+| file | apt |
 | pre-commit | pipx |
 | commitizen | pipx |
 
