@@ -1,7 +1,7 @@
 ---
 description: Weekly update of the Devcontainer
 name: update-devcontainer
-model: github-copilot/gpt-5-mini
+model: github-copilot/gpt-6-luna
 ---
 # Update Devcontainer Image
 
