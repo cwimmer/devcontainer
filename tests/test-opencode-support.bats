@@ -34,8 +34,8 @@ load '/usr/local/share/bats-assert/load'
     assert_success
 }
 
-@test "Makefile targets linux/arm64 platform twice" {
-    run grep -Fc -- "--platform linux/arm64 \\" "$REPO_ROOT/Makefile"
+@test "Makefile targets the native platform for local image loads" {
+    run grep -Fc -- '--platform $(NATIVE_PLATFORM)' "$REPO_ROOT/Makefile"
     assert_output "2"
 }
 

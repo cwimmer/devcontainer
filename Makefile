@@ -2,6 +2,8 @@ CONTAINER_NAME:=ghcr.io/cwimmer/devcontainer
 TAG:=latest
 OPENCODE_TAG:=opencode
 OPENCODE_DOCKERFILE:=Dockerfile.OpenCode
+HOST_ARCH:=$(shell uname -m)
+NATIVE_PLATFORM:=$(if $(filter aarch64 arm64,$(HOST_ARCH)),linux/arm64,linux/amd64)
 
 .PHONY: test
 test: Dockerfile builder
@@ -9,7 +11,7 @@ test: Dockerfile builder
 	--platform linux/amd64,linux/arm64 \
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker buildx build --load \
-	--platform linux/arm64 \
+	--platform $(NATIVE_PLATFORM) \
 	--tag $(CONTAINER_NAME):$(TAG) .
 	docker run --rm $(CONTAINER_NAME):$(TAG) cat /usr/local/share/asdf-tool-versions
 	docker run --rm $(CONTAINER_NAME):$(TAG) sh -lc 'ln -sf /usr/local/share/asdf-tool-versions ~/.tool-versions && bats --version'
@@ -26,7 +28,7 @@ test_opencode: $(OPENCODE_DOCKERFILE) builder test
 	--platform linux/amd64,linux/arm64 \
 	--tag $(CONTAINER_NAME):$(OPENCODE_TAG) -f $(OPENCODE_DOCKERFILE) .
 	docker buildx build --load \
-	--platform linux/arm64 \
+	--platform $(NATIVE_PLATFORM) \
 	--tag $(CONTAINER_NAME):$(OPENCODE_TAG) -f $(OPENCODE_DOCKERFILE) .
 	docker run --rm $(CONTAINER_NAME):$(OPENCODE_TAG) cat /usr/local/share/asdf-tool-versions
 	docker run --rm $(CONTAINER_NAME):$(OPENCODE_TAG) opencode --version
