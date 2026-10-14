@@ -1,0 +1,11 @@
+FROM ghcr.io/cwimmer/devcontainer:latest
+
+ARG OPENCODE_VERSION=2.0.29
+
+RUN curl -fsSL https://opencode.ai/v2/install -o /tmp/opencode-install \
+    && bash /tmp/opencode-install --version "${OPENCODE_VERSION}" --no-modify-path \
+    && rm /tmp/opencode-install \
+    && ln -sf "$HOME/.opencode/bin/opencode" /usr/local/bin/opencode \
+    && installed_version="$(opencode --version)" \
+    && installed_version="${installed_version##* }" \
+    && test "${installed_version#v}" = "${OPENCODE_VERSION}"

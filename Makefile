@@ -73,7 +73,7 @@ pre-commit:
 
 .PHONY: upgrade
 upgrade:
-	@echo "Updating Dockerfile and Dockerfile.OpenCode to latest tool versions..."
+	@echo "Updating Dockerfile, Dockerfile.OpenCode, and Dockerfile.OpenCode2 to latest tool versions..."
 	@bash scripts/update-versions.sh --all
 
 .PHONY: upgrade-terraform
@@ -148,5 +148,10 @@ upgrade-nodejs:
 
 .PHONY: upgrade-opencode
 upgrade-opencode:
-	@echo "Updating OpenCode version in Dockerfile.OpenCode..."
+	@echo "Updating OpenCode v1 version in Dockerfile.OpenCode..."
 	@bash scripts/update-versions.sh --tool opencode
+
+.PHONY: upgrade-opencode2
+upgrade-opencode2:
+	@echo "Updating OpenCode v2 version in Dockerfile.OpenCode2..."
+	@bash scripts/update-versions.sh --tool opencode2

@@ -24,8 +24,13 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 | pre-commit | pipx |
 | commitizen | pipx |
 
-The published `ghcr.io/cwimmer/devcontainer:opencode` image layers
-Node.js and OpenCode on top of the base tool set.
+## Image variants
+
+| Dockerfile | Image recipe | Availability |
+| ---------- | ------------ | ------------ |
+| `Dockerfile` | Base development tools | Published as `ghcr.io/cwimmer/devcontainer:latest` |
+| `Dockerfile.OpenCode` | Base tools, Node.js, and OpenCode v1 | The published `ghcr.io/cwimmer/devcontainer:opencode` image layers Node.js and OpenCode on top of the base tool set. |
+| `Dockerfile.OpenCode2` | Standalone OpenCode v2 on the base tools, without Node.js | Locally buildable at this stage; no published v2 image is documented. |
 
 ## Using default tool versions
 
@@ -111,8 +116,33 @@ inside the freshly built devcontainer image.
 ### Upgrading tool versions
 
 ```sh
-make upgrade       # update all tools to latest versions
+make upgrade                  # base tools plus stable OpenCode 1.x and 2.x
+make upgrade-opencode         # OpenCode v1 only
+make upgrade-opencode2        # OpenCode v2 only
+bash scripts/update-versions.sh --all --check-only
+bash scripts/update-versions.sh --tool opencode2 --version 2.0.29
 ```
+
+For OpenCode, discovery selects the highest canonical stable 1.x version for
+`opencode` and 2.x version for `opencode2`. Explicit OpenCode versions must
+also be canonical stable versions, and the two updates are independent. Other
+tools retain their existing source behavior. Node.js continues to target only
+`Dockerfile.OpenCode` (v1).
+
+Build and verify the standalone v2 image directly (the version comparison
+checks the runtime-reported version against the Dockerfile pin):
+
+```sh
+docker build -f Dockerfile.OpenCode2 -t devcontainer-opencode2-local .
+expected=$(sed -n 's/^ARG OPENCODE_VERSION=//p' Dockerfile.OpenCode2)
+actual=$(docker run --rm --pull=never devcontainer-opencode2-local opencode --version) &&
+  actual=${actual##* } && test "${actual#v}" = "$expected"
+```
+
+The existing `make test_native` and `make test_native_opencode` targets build
+and check the base and v1 images, respectively; they do not build or establish
+runtime verification for v2. Use the direct build and version comparison above
+for v2 verification.
 
 When adding a new asdf-managed tool to this repository, update these
 together: `Dockerfile`, the `/usr/local/share/asdf-tool-versions`

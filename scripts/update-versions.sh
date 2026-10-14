@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# Script to update tool versions in the Dockerfiles
-# Supports updating the base image tools in Dockerfile and the OpenCode
-# image tools in Dockerfile.OpenCode.
+# Script to update tool versions in Dockerfile, Dockerfile.OpenCode (v1), and
+# Dockerfile.OpenCode2 (v2).
 
 set -euo pipefail
 
@@ -17,6 +16,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKERFILE_PATH="${SCRIPT_DIR}/../Dockerfile"
 OPENCODE_DOCKERFILE_PATH="${SCRIPT_DIR}/../Dockerfile.OpenCode"
+OPENCODE2_DOCKERFILE_PATH="${SCRIPT_DIR}/../Dockerfile.OpenCode2"
 
 # Supported tools and their ARG names in Dockerfiles
 declare -A TOOL_ARG_NAMES=(
@@ -35,6 +35,7 @@ declare -A TOOL_ARG_NAMES=(
     ["kubectx"]="KUBECTX_VERSION"
     ["nodejs"]="NODE_MAJOR"
     ["opencode"]="OPENCODE_VERSION"
+    ["opencode2"]="OPENCODE_VERSION"
 )
 
 declare -A TOOL_DOCKERFILE_PATHS=(
@@ -53,6 +54,7 @@ declare -A TOOL_DOCKERFILE_PATHS=(
     ["kubectx"]="$DOCKERFILE_PATH"
     ["nodejs"]="$OPENCODE_DOCKERFILE_PATH"
     ["opencode"]="$OPENCODE_DOCKERFILE_PATH"
+    ["opencode2"]="$OPENCODE2_DOCKERFILE_PATH"
 )
 
 # Function to print colored output
@@ -233,19 +235,48 @@ get_latest_nodejs_version() {
     echo "$latest_version"
 }
 
-# Function to get the latest OpenCode version
+# Function to get the latest stable OpenCode version for a package major
 get_latest_opencode_version() {
-    local latest_version
-    latest_version=$(curl -fsSL "https://api.github.com/repos/anomalyco/opencode/releases/latest" | \
-                     jq -r '.tag_name' | \
-                     sed 's|^v||')
-
-    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
-        print_error "Failed to fetch the latest OpenCode version"
+    local package="$1" major="$2" metadata eligible_versions latest_version
+    if ! metadata=$(curl -fsSL -H 'Accept: application/vnd.npm.install-v1+json' \
+        "https://registry.npmjs.org/$package"); then
+        print_error "Failed to fetch OpenCode $major.x metadata ($package)" >&2
+        return 1
+    fi
+    if ! eligible_versions=$(jq -r --arg major "$major" '
+        if type != "object" then error("expected package object")
+        elif (.versions | type) != "object" then error("expected versions object")
+        else [.versions | keys[] |
+            select(test("^" + $major + "\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))]
+            | .[]
+        end' <<< "$metadata"); then
+        print_error "Invalid OpenCode metadata ($package): expected a JSON object with a versions object" >&2
+        return 1
+    fi
+    if [[ -z "$eligible_versions" ]]; then
+        print_error "No eligible stable OpenCode $major.x release ($package)" >&2
         return 1
     fi
 
-    echo "$latest_version"
+    if ! latest_version=$(printf '%s\n' "$eligible_versions" | LC_ALL=C sort -V | tail -n 1); then
+        print_error "Failed to sort eligible stable OpenCode $major.x versions ($package)" >&2
+        return 1
+    fi
+    printf '%s\n' "$latest_version"
+}
+
+validate_opencode_version() {
+    local tool="$1" version="$2" major pattern
+    case "$tool" in
+        opencode) major=1 ;;
+        opencode2) major=2 ;;
+        *) return 0 ;;
+    esac
+    pattern="^${major}\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    if [[ ! "$version" =~ $pattern ]]; then
+        print_error "Invalid $tool version: '$version'; expected stable $major.x.y" >&2
+        return 1
+    fi
 }
 
 # Function to get the latest kind version
@@ -337,7 +368,10 @@ get_latest_version() {
             get_latest_nodejs_version
             ;;
         opencode)
-            get_latest_opencode_version
+            get_latest_opencode_version 'opencode-ai' 1
+            ;;
+        opencode2)
+            get_latest_opencode_version '@opencode/cli' 2
             ;;
         asdf)
             get_latest_asdf_version
@@ -446,6 +480,8 @@ process_tool() {
         target_version=$(get_latest_version "$tool") || return 1
         print_info "Latest $tool version: $target_version"
     fi
+
+    validate_opencode_version "$tool" "$target_version" || return 1
     
     # Check if update is needed
     if [[ "$current_version" == "$target_version" ]]; then
@@ -476,7 +512,7 @@ Update tool versions in the Dockerfiles.
 OPTIONS:
     -h, --help              Show this help message
     -t, --tool TOOL         Update specific tool
-    -a, --all               Update all supported tools
+    -a, --all               Update all supported tools in all three Dockerfiles
     -c, --check-only        Only check for updates without making changes
     -v, --version VER       Use specific version instead of latest
     --no-backup            Don't create a backup of the original Dockerfile
@@ -484,10 +520,14 @@ OPTIONS:
 EXAMPLES:
     $0 --tool terraform                 # Update Terraform to latest
     $0 --tool golang --version 1.21.5   # Update Go to specific version
-    $0 --all                            # Update all tools to latest
-    $0 --all --check-only               # Check for updates without applying
+    $0 --all                            # Update all tools, including OpenCode v1 and v2
+    $0 --all --check-only               # Check all three Dockerfiles without applying
     $0 --tool kubectl --no-backup       # Update without creating backup
-    $0 --tool opencode                  # Update OpenCode in Dockerfile.OpenCode
+    $0 --tool opencode                  # Update OpenCode v1 in Dockerfile.OpenCode
+    $0 --tool opencode2                 # Update OpenCode v2 in Dockerfile.OpenCode2
+
+OpenCode discovery selects stable 1.x versions for opencode and stable 2.x
+versions for opencode2. Other tools use their existing source behavior.
 
 SUPPORTED TOOLS:
     terraform       - HashiCorp Terraform
@@ -503,7 +543,8 @@ SUPPORTED TOOLS:
     kind            - Kubernetes in Docker
     kubectx         - Kubernetes context and namespace switcher
     nodejs          - Node.js major version for Dockerfile.OpenCode
-    opencode        - OpenCode version for Dockerfile.OpenCode
+    opencode        - OpenCode v1 version for Dockerfile.OpenCode
+    opencode2       - OpenCode v2 version for Dockerfile.OpenCode2
     asdf            - Version manager
 
 EOF
@@ -535,6 +576,10 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -v|--version)
+            if [[ $# -lt 2 || -z "${2:-}" ]]; then
+                print_error "--version requires a version argument"
+                exit 1
+            fi
             SPECIFIC_VERSION="$2"
             shift 2
             ;;
@@ -591,6 +636,12 @@ main() {
             print_error "Dockerfile.OpenCode not found at: $OPENCODE_DOCKERFILE_PATH"
             exit 1
         fi
+
+        if [[ ! -f "$OPENCODE2_DOCKERFILE_PATH" ]]; then
+            print_error "Dockerfile.OpenCode2 not found at: $OPENCODE2_DOCKERFILE_PATH"
+            exit 1
+        fi
+
     elif [[ -n "$TOOL" ]]; then
         local dockerfile_path
         dockerfile_path=$(get_dockerfile_path "$TOOL") || exit 1
