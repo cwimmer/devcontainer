@@ -137,11 +137,13 @@ with v2.
 
 Before the v2 start, record a complete v1 session inventory from the stopped
 source volume. The read-only SQLite examples below require a local Linux helper
-image with `/bin/sh` and `sqlite3`; set `SQLITE_HELPER_IMAGE` to its local image ID and
-verify it with `docker image inspect`. This is a separate inventory helper, not
-a host Python requirement or an extra requirement for the copy script. Run
-these only after all OpenCode servers using the relevant volume have stopped.
-The queries return session IDs and counts only; they do not read credentials.
+image with `/bin/sh` and Python 3's standard-library `sqlite3` module; set
+`SQLITE_HELPER_IMAGE` to its local image ID and verify it with `docker image
+inspect`. The pinned v1 and v2 images provide Python 3 and this module. This is
+a separate inventory helper, not a host Python requirement or an extra
+requirement for the copy script. Run these only after all OpenCode servers using
+the relevant volume have stopped. The queries return session IDs and counts
+only; they do not read credentials.
 
 For v1, list every `session` ID (including archived and child sessions) and
 record the count:
@@ -150,16 +152,26 @@ record the count:
 set -eu
 SOURCE_VOLUME=replace-with-discovered-volume
 SQLITE_HELPER_IMAGE=replace-with-local-sqlite-helper-image-id
-docker run --rm --pull=never --network=none \
+docker run -i --rm --pull=never --network=none \
   --mount "type=volume,src=$SOURCE_VOLUME,dst=/data,readonly,volume-nocopy" \
   --entrypoint /bin/sh "$SQLITE_HELPER_IMAGE" -c \
-  "sqlite3 -readonly -noheader /data/opencode.db 'SELECT id FROM session ORDER BY id;'" \
-  > v1-session-ids.txt
+  'python3 -' <<'PY' > v1-session-ids.txt
+import sqlite3
+
+connection = sqlite3.connect("file:/data/opencode.db?mode=ro&immutable=1", uri=True)
+for (session_id,) in connection.execute("SELECT id FROM session ORDER BY id"):
+    print(session_id)
+PY
 wc -l < v1-session-ids.txt
-docker run --rm --pull=never --network=none \
+docker run -i --rm --pull=never --network=none \
   --mount "type=volume,src=$SOURCE_VOLUME,dst=/data,readonly,volume-nocopy" \
   --entrypoint /bin/sh "$SQLITE_HELPER_IMAGE" -c \
-  "sqlite3 -readonly -noheader /data/opencode.db 'SELECT count(*) FROM session;'"
+  'python3 -' <<'PY'
+import sqlite3
+
+connection = sqlite3.connect("file:/data/opencode.db?mode=ro&immutable=1", uri=True)
+print(connection.execute("SELECT count(*) FROM session").fetchone()[0])
+PY
 ```
 
 Because each query is a simple command under `set -e`, a failed ID query exits
@@ -227,16 +239,26 @@ read-only helper image:
 set -eu
 DESTINATION_VOLUME=replace-with-prepared-v2-volume
 SQLITE_HELPER_IMAGE=replace-with-local-sqlite-helper-image-id
-docker run --rm --pull=never --network=none \
+docker run -i --rm --pull=never --network=none \
   --mount "type=volume,src=$DESTINATION_VOLUME,dst=/data,readonly,volume-nocopy" \
   --entrypoint /bin/sh "$SQLITE_HELPER_IMAGE" -c \
-  "sqlite3 -readonly -noheader /data/opencode.db 'SELECT id FROM session_v2 ORDER BY id;'" \
-  > v2-session-ids.txt
+  'python3 -' <<'PY' > v2-session-ids.txt
+import sqlite3
+
+connection = sqlite3.connect("file:/data/opencode.db?mode=ro&immutable=1", uri=True)
+for (session_id,) in connection.execute("SELECT id FROM session_v2 ORDER BY id"):
+    print(session_id)
+PY
 wc -l < v2-session-ids.txt
-docker run --rm --pull=never --network=none \
+docker run -i --rm --pull=never --network=none \
   --mount "type=volume,src=$DESTINATION_VOLUME,dst=/data,readonly,volume-nocopy" \
   --entrypoint /bin/sh "$SQLITE_HELPER_IMAGE" -c \
-  "sqlite3 -readonly -noheader /data/opencode.db 'SELECT count(*) FROM session_v2;'"
+  'python3 -' <<'PY'
+import sqlite3
+
+connection = sqlite3.connect("file:/data/opencode.db?mode=ro&immutable=1", uri=True)
+print(connection.execute("SELECT count(*) FROM session_v2").fetchone()[0])
+PY
 diff -u v1-session-ids.txt v2-session-ids.txt
 ```
 
