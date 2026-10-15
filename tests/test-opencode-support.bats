@@ -3,11 +3,171 @@
 load 'test_helper/common'
 load 'test_helper/updater'
 load 'test_helper/image-build'
+load 'test_helper/data-copy.bash'
 load '/usr/local/share/bats-support/load'
 load '/usr/local/share/bats-assert/load'
 
 setup() {
     setup_updater
+    setup_data_copy
+}
+
+@test "repository devcontainer selects v2 and isolated persistence" {
+    run python3 "$REPO_ROOT/tests/test_helper/data_copy_assertions.py" config "$REPO_ROOT"
+    assert_success
+}
+
+@test "data preparation help and malformed arguments are handled before Docker" {
+    run "$DATA_COPY_SCRIPT" --help
+    assert_success
+    assert_output --partial 'POSIX shell'
+    assert_output --partial 'Docker CLI'
+    assert_output --partial 'cp -a'
+    assert_output --partial 'mkdir, ln, rm, mktemp'
+    assert_output --partial 'writable /tmp'
+    assert_output --partial 'other-repo-v1 other-repo-v2 local-helper:fixture'
+    assert_output --partial 'Migration has not run'
+    assert_output --partial 'all other writers'
+    assert_output --partial 'cannot atomically combine'
+    assert_output --partial 'DOCKER_CONTEXT'
+    assert_output --partial 'DOCKER_HOST (overrides the selected context endpoint)'
+    assert_data_copy_calls help
+
+    for args in none one two extra empty-source empty-destination empty-image equal invalid-source invalid-destination; do
+        : > "$DATA_COPY_LOG"
+        case "$args" in
+            none) run "$DATA_COPY_SCRIPT" ;;
+            one) run "$DATA_COPY_SCRIPT" other-repo-v1 ;;
+            two) run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 ;;
+            extra) run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture extra ;;
+            empty-source) run "$DATA_COPY_SCRIPT" '' other-repo-v2 local-helper:fixture ;;
+            empty-destination) run "$DATA_COPY_SCRIPT" other-repo-v1 '' local-helper:fixture ;;
+            empty-image) run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 '' ;;
+            equal) run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v1 local-helper:fixture ;;
+            invalid-source) run "$DATA_COPY_SCRIPT" '_invalid' other-repo-v2 local-helper:fixture ;;
+            invalid-destination) run "$DATA_COPY_SCRIPT" other-repo-v1 'x' local-helper:fixture ;;
+        esac
+        assert_failure
+        assert_equal 2 "$status"
+        assert_data_copy_calls usage
+    done
+}
+
+@test "data preparation refuses missing source and every existing destination" {
+    local scenario
+    for scenario in missing-source existing-destination existing-destination-empty; do
+        reset_data_copy_fixture
+        DATA_COPY_SCENARIO="$scenario" run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+        assert_failure
+        assert_data_copy_calls "$scenario"
+    done
+}
+
+@test "data preparation fails closed on Docker, inspect, image, and helper preflight errors" {
+    local scenario
+    for scenario in daemon-failure context-failure context-endpoint-failure list-failure source-inspect-failure consumer-failure image-failure preflight-failure; do
+        reset_data_copy_fixture
+        DATA_COPY_SCENARIO="$scenario" run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+        assert_failure
+        assert_data_copy_calls "$scenario"
+        refute_output --partial 'Creating destination'
+    done
+}
+
+@test "data preparation names running consumers and never stops or removes them" {
+    local scenario
+    for scenario in running-source running-destination; do
+        reset_data_copy_fixture
+        DATA_COPY_SCENARIO="$scenario" run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+        assert_failure
+        assert_output --partial 'fixture-writer'
+        assert_output --partial 'stop'
+        assert_data_copy_calls "$scenario"
+    done
+}
+
+@test "data preparation copies with immutable image and quiet verification" {
+    run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 'local-helper:fixture'
+    assert_success
+    assert_output --partial 'Docker context: fixture-context'
+    assert_output --partial 'other-repo-v1'
+    assert_output --partial 'other-repo-v2'
+    assert_output --partial 'DOCKER_CONTEXT'
+    assert_output --partial 'DOCKER_HOST'
+    assert_output --partial 'fixture-daemon'
+    assert_output --partial 'Selected context endpoint: unix:///fixture/docker.sock'
+    assert_output --partial 'Effective Docker endpoint: unix:///fixture/docker.sock (selected Docker context endpoint)'
+    assert_output --partial 'migration has not run'
+    assert_data_copy_calls success
+}
+
+@test "data preparation shows Docker endpoint override precedence" {
+    reset_data_copy_fixture
+    run env DOCKER_HOST=tcp://docker-host.invalid:2375 "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+    assert_success
+    assert_output --partial 'Selected context endpoint: unix:///fixture/docker.sock'
+    assert_output --partial 'Effective Docker endpoint: tcp://docker-host.invalid:2375 (DOCKER_HOST (overrides selected context endpoint))'
+    assert_data_copy_calls success
+
+    reset_data_copy_fixture
+    run env DOCKER_HOST=tcp://lower-precedence.invalid:2375 DOCKER_CONTEXT=fixture-override "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+    assert_success
+    assert_output --partial 'Docker context: fixture-override'
+    assert_output --partial 'Selected context endpoint: unix:///override/context.sock'
+    assert_output --partial 'Effective Docker endpoint: unix:///override/context.sock (DOCKER_CONTEXT (overrides DOCKER_HOST))'
+    assert_data_copy_calls success
+}
+
+@test "data preparation rejects a destination populated at mount time" {
+    DATA_COPY_SCENARIO=destination-race run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+    assert_failure
+    assert_output --partial 'empty'
+    assert_data_copy_calls destination-race
+}
+
+@test "data preparation rechecks consumers after destination creation" {
+    DATA_COPY_SCENARIO=consumer-race run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+    assert_failure
+    assert_output --partial 'fixture-writer'
+    assert_data_copy_calls consumer-race
+}
+
+@test "data preparation retains and reports a possibly partial destination after failure" {
+    local scenario
+    for scenario in create-failure copy-failure compare-failure interrupt; do
+        reset_data_copy_fixture
+        DATA_COPY_SCENARIO="$scenario" run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+        assert_failure
+        assert_output --partial 'partial'
+        refute_output --partial 'Preparation complete'
+        test "$(printf '%s\n' "$output" | grep -c 'may be partial')" -eq 1
+        assert_data_copy_calls "$scenario"
+    done
+}
+
+@test "data preparation is standalone with spaced script path and quoted image argument" {
+    cd "$BATS_TEST_TMPDIR"
+    run "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 'local-helper:fixture with spaces'
+    assert_success
+    assert_data_copy_calls success-quoted-image
+    test "$(find "$DATA_COPY_REPO" -type f | wc -l)" -eq 1
+}
+
+@test "data preparation has matching sh and dash argument behavior" {
+    local shell
+    for shell in sh dash; do
+        command -v "$shell" >/dev/null 2>&1 || continue
+        reset_data_copy_fixture
+    DATA_COPY_SCENARIO=success run "$shell" "$DATA_COPY_SCRIPT" other-repo-v1 other-repo-v2 local-helper:fixture
+        assert_success
+        assert_data_copy_calls success
+
+        reset_data_copy_fixture
+        run "$shell" "$DATA_COPY_SCRIPT" other-repo-v1
+        assert_failure
+        assert_equal 2 "$status"
+        assert_data_copy_calls usage
+    done
 }
 
 @test "make test_opencode target is available" {

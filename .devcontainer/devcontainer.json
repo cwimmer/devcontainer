@@ -3,7 +3,7 @@
 
     "build": {
         "context": "..",
-        "dockerfile": "../Dockerfile.OpenCode"
+        "dockerfile": "../Dockerfile.OpenCode2"
     },
 
     "features": {
@@ -26,6 +26,6 @@
     },
 
     "mounts": [
-        "source=devcontainer-opencode-data,target=/root/.local/share/opencode,type=volume"
+        "source=devcontainer-opencode2-data,target=/root/.local/share/opencode,type=volume"
     ]
 }
