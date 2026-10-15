@@ -2,6 +2,8 @@ CONTAINER_NAME:=ghcr.io/cwimmer/devcontainer
 TAG:=latest
 OPENCODE_TAG:=opencode
 OPENCODE_DOCKERFILE:=Dockerfile.OpenCode
+OPENCODE2_TAG:=opencode2
+OPENCODE2_DOCKERFILE:=Dockerfile.OpenCode2
 HOST_ARCH:=$(shell uname -m)
 NATIVE_PLATFORM:=$(if $(filter aarch64 arm64,$(HOST_ARCH)),linux/arm64,linux/amd64)
 
@@ -44,6 +46,7 @@ clean:
 	-docker buildx rm builder
 	-docker rmi $(CONTAINER_NAME):$(TAG)
 	-docker rmi $(CONTAINER_NAME):$(OPENCODE_TAG)
+	-docker rmi $(CONTAINER_NAME):$(OPENCODE2_TAG)
 
 .PHONY: test_native
 test_native: Dockerfile builder
@@ -64,6 +67,26 @@ test_native_opencode: $(OPENCODE_DOCKERFILE) builder test_native
 	--tag $(CONTAINER_NAME):$(OPENCODE_TAG) -f $(OPENCODE_DOCKERFILE) .
 	docker run --rm $(CONTAINER_NAME):$(OPENCODE_TAG) cat /usr/local/share/asdf-tool-versions
 	docker run --rm $(CONTAINER_NAME):$(OPENCODE_TAG) opencode --version
+
+.PHONY: test_opencode2
+test_opencode2: $(OPENCODE2_DOCKERFILE) builder test
+	docker buildx build \
+	--platform linux/amd64,linux/arm64 \
+	--pull \
+	--tag $(CONTAINER_NAME):$(OPENCODE2_TAG) -f $(OPENCODE2_DOCKERFILE) .
+	docker buildx build --load \
+	--platform $(NATIVE_PLATFORM) \
+	--pull \
+	--tag $(CONTAINER_NAME):$(OPENCODE2_TAG) -f $(OPENCODE2_DOCKERFILE) .
+	sh scripts/verify-opencode2.sh "$(CONTAINER_NAME):$(OPENCODE2_TAG)"
+
+.PHONY: test_native_opencode2
+test_native_opencode2: $(OPENCODE2_DOCKERFILE) builder test_native
+	docker buildx build --load \
+	--platform $(NATIVE_PLATFORM) \
+	--pull \
+	--tag $(CONTAINER_NAME):$(OPENCODE2_TAG) -f $(OPENCODE2_DOCKERFILE) .
+	sh scripts/verify-opencode2.sh "$(CONTAINER_NAME):$(OPENCODE2_TAG)"
 
 .PHONY: pre-commit
 pre-commit:

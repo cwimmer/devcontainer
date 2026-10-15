@@ -72,3 +72,33 @@ jobs:
           tags: |
             ghcr.io/cwimmer/devcontainer:opencode
           platforms: linux/amd64,linux/arm64
+
+      - name: Build OpenCode v2 image for native verification
+        id: build_opencode2_native
+        uses: docker/build-push-action@v7
+        timeout-minutes: 30
+        with:
+          context: .
+          file: Dockerfile.OpenCode2
+          tags: ghcr.io/cwimmer/devcontainer:opencode2
+          platforms: linux/amd64
+          pull: true
+          load: true
+
+      - name: Verify OpenCode v2 image
+        id: verify_opencode2
+        run: >-
+          sh scripts/verify-opencode2.sh
+          ghcr.io/cwimmer/devcontainer:opencode2
+        timeout-minutes: 20
+
+      - name: Build and push OpenCode v2 multi-architecture image
+        id: publish_opencode2
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.OpenCode2
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/cwimmer/devcontainer:opencode2
+          platforms: linux/amd64,linux/arm64
+          pull: true

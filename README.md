@@ -28,9 +28,9 @@ Includes common CLI tools managed by [asdf](https://asdf-vm.com/).
 
 | Dockerfile | Image recipe | Availability |
 | ---------- | ------------ | ------------ |
-| `Dockerfile` | Base development tools | Published as `ghcr.io/cwimmer/devcontainer:latest` |
-| `Dockerfile.OpenCode` | Base tools, Node.js, and OpenCode v1 | The published `ghcr.io/cwimmer/devcontainer:opencode` image layers Node.js and OpenCode on top of the base tool set. |
-| `Dockerfile.OpenCode2` | Standalone OpenCode v2 on the base tools, without Node.js | Locally buildable at this stage; no published v2 image is documented. |
+| `Dockerfile` | Base development tools | `ghcr.io/cwimmer/devcontainer:latest` |
+| `Dockerfile.OpenCode` | Base tools, Node.js, and OpenCode v1 | `ghcr.io/cwimmer/devcontainer:opencode` |
+| `Dockerfile.OpenCode2` | Base tools and standalone OpenCode v2, without Node.js | Configured publication destination: `ghcr.io/cwimmer/devcontainer:opencode2` |
 
 ## Using default tool versions
 
@@ -98,20 +98,36 @@ Then edit the version for the tool you want to change.
 
 ### Building
 
+The verification targets cover the base image, OpenCode v1, and OpenCode v2.
+The `test*` targets build both `linux/amd64` and `linux/arm64`; the
+`test_native*` targets build only the host's native platform. Each target runs
+runtime checks on the locally loaded image for the relevant variant. A
+multi-platform target also loads its native-platform image for those runtime
+checks; it does not runtime-test the other architecture.
+
 ```sh
-make test          # multi-platform build (amd64 + arm64)
-make test_opencode # multi-platform OpenCode image build (amd64 + arm64)
-make test_native   # native platform only (faster)
-make test_native_opencode # native OpenCode image build (faster)
+make test                    # base: multi-platform build, native runtime checks
+make test_opencode           # v1: multi-platform build, native runtime checks
+make test_opencode2          # v2: multi-platform build, native runtime checks
+make test_native             # base: host-native build and runtime checks
+make test_native_opencode    # v1: host-native build and runtime checks
+make test_native_opencode2   # v2: host-native build and runtime checks
 ```
+
+The v1 and v2 targets depend on the base target, which independently builds and
+checks the base image from this checkout. That local base image is not passed to
+the derived-image build: derived builds explicitly resolve their base from the
+published `ghcr.io/cwimmer/devcontainer:latest` image. The v2 image is configured
+for the `opencode2` destination above; this configuration alone is not evidence
+of a completed registry publication.
 
 ### Testing
 
 The BATS test suite lives in `tests/test-*.bats` and asserts that the
 devcontainer's tooling, upgrade workflow, and OpenCode wiring stay
-consistent. Run `make test` for the multi-platform build or
-`make test_native` for the faster native build; both invoke the suite
-inside the freshly built devcontainer image.
+consistent. The base targets invoke the suite inside the freshly built base
+image; the derived-image targets first run their base prerequisite and then
+build and check the requested OpenCode variant.
 
 ### Upgrading tool versions
 
@@ -129,20 +145,12 @@ also be canonical stable versions, and the two updates are independent. Other
 tools retain their existing source behavior. Node.js continues to target only
 `Dockerfile.OpenCode` (v1).
 
-Build and verify the standalone v2 image directly (the version comparison
-checks the runtime-reported version against the Dockerfile pin):
-
-```sh
-docker build -f Dockerfile.OpenCode2 -t devcontainer-opencode2-local .
-expected=$(sed -n 's/^ARG OPENCODE_VERSION=//p' Dockerfile.OpenCode2)
-actual=$(docker run --rm --pull=never devcontainer-opencode2-local opencode --version) &&
-  actual=${actual##* } && test "${actual#v}" = "$expected"
-```
-
-The existing `make test_native` and `make test_native_opencode` targets build
-and check the base and v1 images, respectively; they do not build or establish
-runtime verification for v2. Use the direct build and version comparison above
-for v2 verification.
+Use `make test_native_opencode2` to build and verify v2 on the host-native
+platform, or `make test_opencode2` to build both supported platforms and verify
+the native image. The v2 runtime check compares the reported OpenCode version
+with the pin in `Dockerfile.OpenCode2`. These checks establish local build and
+runtime results only; report workflow/CI execution and registry publication as
+separate evidence.
 
 When adding a new asdf-managed tool to this repository, update these
 together: `Dockerfile`, the `/usr/local/share/asdf-tool-versions`

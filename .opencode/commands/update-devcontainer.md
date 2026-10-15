@@ -24,35 +24,41 @@ model: github-copilot/gpt-6-luna
    three Dockerfiles are unchanged.
 4. If any Dockerfile changed, report the updated tools and versions, identifying
    `opencode` as v1 and `opencode2` as v2.
-5. Run `make test_native`, then `make test_native_opencode`, allowing at least
-   20 minutes for each command. These targets verify base and v1 only; do not
-   treat their results as v2 verification.
-6. Directly build and run v2, allowing at least 20 minutes for the build:
-
-   ```sh
-   docker build -f Dockerfile.OpenCode2 -t devcontainer-opencode2-local .
-   expected=$(sed -n 's/^ARG OPENCODE_VERSION=//p' Dockerfile.OpenCode2)
-   actual=$(docker run --rm --pull=never devcontainer-opencode2-local opencode --version) &&
-     actual=${actual##* } && test "${actual#v}" = "$expected"
-   ```
-
-7. Report base, v1, and v2 results separately. Include failing command output
-   and identify checks that were not run; a success for one image is not
-   evidence for another.
+5. Run `make test_native`, `make test_native_opencode`, and
+   `make test_native_opencode2`, allowing at least 20 minutes for each command.
+   Record the host architecture and report base, v1, and v2 outcomes separately.
+   The v2 target checks the runtime-reported OpenCode version against the
+   `Dockerfile.OpenCode2` pin.
+6. When multi-platform verification is appropriate, run `make test` for base,
+   `make test_opencode` for v1, and `make test_opencode2` for v2. These targets
+   build `linux/amd64` and `linux/arm64`, then load and runtime-check only the
+   host-native image. In particular, `make test_opencode2` does not establish
+   arm64 runtime evidence on an amd64 host (or amd64 runtime evidence on arm64).
+7. The derived-image targets separately build/check the checkout's base as a
+   prerequisite, but that local image does not supply the derived build's base.
+   The v2 build resolves `ghcr.io/cwimmer/devcontainer:latest` from the
+   published registry image. The configured v2 destination is
+   `ghcr.io/cwimmer/devcontainer:opencode2`; configured destination is not
+   evidence that publication succeeded.
+8. Report per-image local tests/builds/runtime results, including failures and
+   skipped checks. Keep local evidence separate from workflow/CI evidence and
+   registry publication evidence. Report remote CI execution as unverified
+   unless observed; publication requires successful main-branch workflow
+   evidence and a registry manifest showing both architectures. Do not trigger
+   workflows, publish, or push to obtain evidence.
 
 ## Context
 
 - Repo: `cwimmer/devcontainer`
-- `Makefile` defines `upgrade`, `upgrade-opencode`, `upgrade-opencode2`,
-  `test_native`, and `test_native_opencode`.
+- `Makefile` defines `upgrade`, `upgrade-opencode`, `upgrade-opencode2`, and
+  six base/v1/v2 native and multi-platform verification targets.
 - `upgrade` runs `scripts/update-versions.sh --all`.
-- `Dockerfile.OpenCode2` can be built locally; the existing native Make targets
-  cover only base and v1.
+- Image tags are `latest` (base), `opencode` (v1), and `opencode2` (v2).
+- Derived v2 builds resolve the published `latest` base; their base prerequisite
+  independently verifies the local base image and does not supply it to that
+  build.
 
 ## Notes
 
-- Preserve the build/run command line breaks and shell quoting in the v2
-  version-comparison block.
 - Keep the final summary short and actionable.
-- Set a timeout of at least 20 minutes for each native Make target and for the
-  direct v2 Docker build.
+- Set a timeout of at least 20 minutes for each native Make target.
