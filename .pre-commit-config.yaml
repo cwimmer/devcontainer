@@ -17,3 +17,10 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff-check
+        files: ^tests/(test_helper/.*\.py|test_opencode_helpers\.py)$
+      - id: ruff-format
+        files: ^tests/(test_helper/.*\.py|test_opencode_helpers\.py)$
