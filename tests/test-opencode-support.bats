@@ -529,6 +529,7 @@ EOF
             IMAGE_FAIL="$failure" run sh "$IMAGE_REPO/scripts/verify-opencode2.sh" "$image_ref"
         fi
         assert_failure
+        assert_runtime_failure_stops_at_expected_stage "$failure"
     done
 
     : > "$IMAGE_LOG"

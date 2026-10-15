@@ -245,6 +245,20 @@ def check_runtime_failure(calls: list[list[str]], detail: str | None) -> None:
             raise AssertionError(
                 f"runtime checks must not follow missing-image failure; actual calls: {calls!r}"
             )
+    elif detail == "metadata":
+        metadata_indices = [
+            index
+            for index in runtime_indices
+            if calls[index][-2:] == ["cat", "/usr/local/share/asdf-tool-versions"]
+        ]
+        if not metadata_indices:
+            raise AssertionError(
+                f"runtime-failure metadata requires a metadata command attempt; actual calls: {calls!r}"
+            )
+        if version_indices:
+            raise AssertionError(
+                f"metadata failure forbids an OpenCode version attempt; actual calls: {calls!r}"
+            )
     elif not version_indices:
         raise AssertionError(
             f"runtime-failure {detail} requires an OpenCode version attempt; actual calls: {calls!r}"

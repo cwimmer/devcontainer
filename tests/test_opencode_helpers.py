@@ -811,35 +811,100 @@ class ImageAssertionsAdditionalTests(unittest.TestCase):
                 self.assertIn(option, result.stderr)
 
     def test_v2_order_scenario_rejects_verification_before_build(self) -> None:
+        image = "ghcr.io/cwimmer/devcontainer:opencode2"
+        image_id = "sha256:" + "a" * 64
+        calls = [
+            [
+                "run",
+                "--rm",
+                "ghcr.io/cwimmer/devcontainer:latest",
+                "cat",
+                "/usr/local/share/asdf-tool-versions",
+            ],
+            [
+                "buildx",
+                "build",
+                "-f",
+                "Dockerfile.OpenCode2",
+                "--tag",
+                image,
+                "--platform",
+                "linux/amd64",
+                "--load",
+                ".",
+            ],
+            ["image", "inspect", "--format", "{{.Id}}", image],
+            [
+                "run",
+                "--rm",
+                "--pull=never",
+                image_id,
+                "cat",
+                "/usr/local/share/asdf-tool-versions",
+            ],
+            ["run", "--rm", "--pull=never", image_id, "opencode", "--version"],
+        ]
         with tempfile.TemporaryDirectory() as temporary:
-            path = self.write_calls(
-                Path(temporary),
-                [
-                    [
-                        "run",
-                        "--rm",
-                        "repo:latest",
-                        "cat",
-                        "/usr/local/share/asdf-tool-versions",
-                    ],
-                    ["image", "inspect", "--format", "{{.Id}}", "repo:opencode2"],
-                    [
-                        "buildx",
-                        "build",
-                        "-f",
-                        "Dockerfile.OpenCode2",
-                        "--tag",
-                        "repo:opencode2",
-                        "--platform",
-                        "linux/amd64",
-                        "--load",
-                    ],
-                ],
-            )
+            path = self.write_calls(Path(temporary), calls)
+            result = self.invoke(path, "v2-order")
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            reordered = calls[:1] + calls[2:] + calls[1:2]
+            path = self.write_calls(Path(temporary), reordered)
             result = self.invoke(path, "v2-order")
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("before", result.stderr)
+        self.assertIn("all v2 builds must occur before verification", result.stderr)
+
+    def test_metadata_failure_requires_inspection_and_metadata_without_version(
+        self,
+    ) -> None:
+        inspect = [
+            "image",
+            "inspect",
+            "--format",
+            "{{.Id}}",
+            "ghcr.io/cwimmer/devcontainer:opencode2",
+        ]
+        runtime = ["run", "--rm", "--pull=never", "sha256:" + "a" * 64]
+        metadata = runtime + ["cat", "/usr/local/share/asdf-tool-versions"]
+        version = runtime + ["opencode", "--version"]
+        cases = (
+            ("stops after metadata", [inspect, metadata], None),
+            (
+                "continues to version",
+                [inspect, metadata, version],
+                "metadata failure forbids an OpenCode version attempt",
+            ),
+            (
+                "missing metadata",
+                [inspect],
+                "runtime-failure metadata requires a metadata command attempt",
+            ),
+            (
+                "version without metadata",
+                [inspect, version],
+                "runtime-failure metadata requires a metadata command attempt",
+            ),
+            (
+                "missing inspection",
+                [metadata],
+                "runtime-failure metadata requires an image inspect call",
+            ),
+        )
+        for label, calls, diagnostic in cases:
+            with (
+                self.subTest(sequence=label),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                path = self.write_calls(Path(temporary), calls)
+                result = self.invoke(path, "runtime-failure", "metadata")
+
+                if diagnostic is None:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(diagnostic, result.stderr)
 
     def test_build_failure_scenario_rejects_forbidden_post_failure_commands(
         self,
