@@ -12,6 +12,11 @@ setup() {
     setup_data_copy
 }
 
+@test "repository devcontainer selects v2 and isolated persistence" {
+    run python3 "$REPO_ROOT/tests/test_helper/data_copy_assertions.py" config "$REPO_ROOT"
+    assert_success
+}
+
 @test "data preparation help and malformed arguments are handled before Docker" {
     run "$DATA_COPY_SCRIPT" --help
     assert_success

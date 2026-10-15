@@ -12,6 +12,20 @@ SOURCE = "other-repo-v1"
 DESTINATION = "other-repo-v2"
 IMAGE = "local-helper:fixture"
 IMAGE_ID = "sha256:" + "a" * 64
+DOCKER_FEATURE = "ghcr.io/devcontainers/features/docker-in-docker:2"
+DOCKER_FEATURE_DIGEST = (
+    "sha256:25b9f05705ffba7dbe503230ac76081419306f8c8bc88e0ce78c4ecd99a0c78c"
+)
+OPENCODE_DATA_MOUNT = (
+    "source=devcontainer-opencode2-data,target=/root/.local/share/opencode,type=volume"
+)
+OPENCODE_CONFIG_TARGET = "/root/.config/opencode"
+VSCODE_EXTENSIONS = [
+    "ms-vscode.makefile-tools",
+    "redhat.vscode-yaml",
+    "DavidAnson.vscode-markdownlint",
+    "sst-dev.opencode",
+]
 
 
 def load_calls(path: Path) -> list[list[str]]:
@@ -439,14 +453,113 @@ def check_copy_calls(calls: list[list[str]], scenario: str) -> None:
     )
 
 
+def check_devcontainer(root: Path) -> None:
+    """Check this repository's approved v2 devcontainer and locked feature."""
+    config_path = root / ".devcontainer" / "devcontainer.json"
+    lock_path = root / ".devcontainer" / "devcontainer-lock.json"
+    config = load_json(config_path)
+    lock = load_json(lock_path)
+
+    build = require_mapping(config.get("build"), "build")
+    require_equal(
+        build.get("dockerfile"), "../Dockerfile.OpenCode2", "build.dockerfile"
+    )
+    require_equal(build.get("context"), "..", "build.context")
+
+    mounts = config.get("mounts")
+    if not isinstance(mounts, list) or any(
+        not isinstance(item, str) for item in mounts
+    ):
+        raise ValueError("mounts: expected a list of strings")
+    require_equal(mounts, [OPENCODE_DATA_MOUNT], "mounts")
+    if any(
+        "devcontainer-opencode-data" in mount or OPENCODE_CONFIG_TARGET in mount
+        for mount in mounts
+    ):
+        raise AssertionError("mounts: original data/configuration mount is forbidden")
+
+    lifecycle_fields = {
+        "initializeCommand",
+        "onCreateCommand",
+        "updateContentCommand",
+        "postCreateCommand",
+        "postStartCommand",
+        "postAttachCommand",
+    }
+    configured_lifecycle = sorted(lifecycle_fields.intersection(config))
+    if configured_lifecycle:
+        raise AssertionError(
+            f"lifecycle commands must be absent; found {configured_lifecycle!r}"
+        )
+
+    features = require_mapping(config.get("features"), "features")
+    docker = require_mapping(features.get(DOCKER_FEATURE), f"features.{DOCKER_FEATURE}")
+    require_equal(docker.get("version"), "latest", f"features.{DOCKER_FEATURE}.version")
+    require_equal(docker.get("moby"), False, f"features.{DOCKER_FEATURE}.moby")
+    require_equal(
+        docker.get("enableNonRootDocker"),
+        "true",
+        f"features.{DOCKER_FEATURE}.enableNonRootDocker",
+    )
+
+    customizations = require_mapping(config.get("customizations"), "customizations")
+    vscode = require_mapping(customizations.get("vscode"), "customizations.vscode")
+    require_equal(vscode.get("extensions"), VSCODE_EXTENSIONS, "VS Code extensions")
+
+    locked_features = require_mapping(lock.get("features"), "lock.features")
+    locked_docker = require_mapping(
+        locked_features.get(DOCKER_FEATURE), f"lock.features.{DOCKER_FEATURE}"
+    )
+    require_equal(locked_docker.get("version"), "2.17.0", "locked feature version")
+    require_equal(
+        locked_docker.get("resolved"),
+        f"ghcr.io/devcontainers/features/docker-in-docker@{DOCKER_FEATURE_DIGEST}",
+        "locked feature resolution",
+    )
+    require_equal(
+        locked_docker.get("integrity"),
+        DOCKER_FEATURE_DIGEST,
+        "locked feature integrity",
+    )
+
+
+def load_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{path}: cannot load JSON: {error}") from error
+    return require_mapping(value, str(path))
+
+
+def require_mapping(value: object, field: str) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError(f"{field}: expected an object")
+    return value
+
+
+def require_equal(actual: object, expected: object, field: str) -> None:
+    if actual != expected:
+        raise AssertionError(f"{field}: expected {expected!r}, got {actual!r}")
+
+
 def require(condition: bool, message: str, actual: object) -> None:
     if not condition:
         raise AssertionError(f"{message}; actual calls: {actual!r}")
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) == 2 and argv[0] == "config":
+        try:
+            check_devcontainer(Path(argv[1]))
+        except (OSError, ValueError, AssertionError) as error:
+            print(f"devcontainer assertion failed: {error}", file=sys.stderr)
+            return 1
+        return 0
     if len(argv) != 3 or argv[0] != "calls":
-        print("usage: data_copy_assertions.py calls LOG SCENARIO", file=sys.stderr)
+        print(
+            "usage: data_copy_assertions.py calls LOG SCENARIO | config REPO_ROOT",
+            file=sys.stderr,
+        )
         return 2
     try:
         calls = load_calls(Path(argv[1]))
