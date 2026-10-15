@@ -436,110 +436,18 @@ EOF
     assert_success
 }
 
+@test "OpenCode Python helper regressions pass" {
+    run python3 "$REPO_ROOT/tests/test_opencode_helpers.py" -v
+    assert_success
+}
+
 @test "workflow verifies v2 before conditional multiarch publication" {
-    run python3 - "$REPO_ROOT/.github/workflows/image-build.yaml" <<'PY'
-import pathlib
-import re
-import sys
-
-text = pathlib.Path(sys.argv[1]).read_text()
-lines = text.splitlines()
-steps = {}
-for index, line in enumerate(lines):
-    if re.match(r"      - name:", line):
-        end = index + 1
-        while end < len(lines) and not re.match(r"      - name:", lines[end]):
-            end += 1
-        block = "\n".join(lines[index:end])
-        match = re.search(r"^        id: ([a-z0-9_]+)$", block, re.MULTILINE)
-        if match:
-            steps[match.group(1)] = block
-
-expected_ids = ["build_opencode2_native", "verify_opencode2", "publish_opencode2"]
-positions = [text.index(f"        id: {step_id}") for step_id in expected_ids if step_id in steps]
-assert len(positions) == 3 and positions == sorted(positions), "v2 steps must have ordered IDs"
-
-native = steps["build_opencode2_native"]
-assert "uses: docker/build-push-action@v7" in native
-for field in (
-    "context: .",
-    "file: Dockerfile.OpenCode2",
-    "tags: ghcr.io/cwimmer/devcontainer:opencode2",
-    "platforms: linux/amd64",
-    "pull: true",
-    "load: true",
-):
-    assert field in native, f"native build missing {field!r}"
-assert native.count("ghcr.io/cwimmer/devcontainer:opencode2") == 1, "native build must have only the v2 tag"
-assert len(re.findall(r"^\s+tags:", native, re.MULTILINE)) == 1, "native build must have one tags field"
-assert "push:" not in native, "native build must not publish"
-assert "timeout-minutes: 30" in native
-
-verify = steps["verify_opencode2"]
-assert "sh scripts/verify-opencode2.sh" in verify
-assert "ghcr.io/cwimmer/devcontainer:opencode2" in verify
-assert "timeout-minutes: 20" in verify
-
-publish = steps["publish_opencode2"]
-assert "uses: docker/build-push-action@v7" in publish
-for field in (
-    "context: .",
-    "file: Dockerfile.OpenCode2",
-    "tags: ghcr.io/cwimmer/devcontainer:opencode2",
-    "platforms: linux/amd64,linux/arm64",
-    "pull: true",
-    "push: ${{ github.ref == 'refs/heads/main' }}",
-):
-    assert field in publish, f"publication missing {field!r}"
-assert publish.count("ghcr.io/cwimmer/devcontainer:opencode2") == 1, "publication must have only the v2 tag"
-assert "continue-on-error" not in "\n".join(steps[step_id] for step_id in expected_ids)
-assert "if: always()" not in "\n".join(steps[step_id] for step_id in expected_ids)
-PY
+    run python3 "$REPO_ROOT/tests/test_helper/workflow_assertions.py" "$REPO_ROOT/.github/workflows/image-build.yaml" v2
     assert_success
 }
 
 @test "workflow preserves base v1 and failure gates" {
-    run python3 - "$REPO_ROOT/.github/workflows/image-build.yaml" <<'PY'
-import pathlib
-import re
-import sys
-
-text = pathlib.Path(sys.argv[1]).read_text()
-lines = text.splitlines()
-steps = {}
-for index, line in enumerate(lines):
-    if re.match(r"      - name:", line):
-        end = index + 1
-        while end < len(lines) and not re.match(r"      - name:", lines[end]):
-            end += 1
-        block = "\n".join(lines[index:end])
-        match = re.search(r"^        uses: docker/build-push-action@v7$", block, re.MULTILINE)
-        if match:
-            name = re.match(r"      - name: (.+)", lines[index]).group(1)
-            steps[name] = block
-
-base = steps["Build and push base multi-architecture image"]
-assert "tags: |\n            ghcr.io/cwimmer/devcontainer:latest" in base
-assert base.count("ghcr.io/cwimmer/devcontainer:latest") == 1
-assert len(re.findall(r"^\s+tags:", base, re.MULTILINE)) == 1
-assert "platforms: linux/amd64,linux/arm64" in base
-assert "push: ${{ github.ref == 'refs/heads/main' }}" in base
-v1 = steps["Build and push OpenCode multi-architecture image"]
-assert "file: Dockerfile.OpenCode" in v1
-assert "ghcr.io/cwimmer/devcontainer:opencode\n" in v1
-assert v1.count("ghcr.io/cwimmer/devcontainer:opencode") == 1
-assert len(re.findall(r"^\s+tags:", v1, re.MULTILINE)) == 1
-assert "platforms: linux/amd64,linux/arm64" in v1
-assert "push: ${{ github.ref == 'refs/heads/main' }}" in v1
-
-trigger_section = text.split("jobs:", 1)[0]
-for trigger in ("  push:\n    branches:\n      - main", "  pull_request:\n    branches:\n      - main", "  workflow_dispatch:"):
-    assert trigger in trigger_section, f"existing workflow trigger lost: {trigger!r}"
-
-new_steps = text[text.index("        id: build_opencode2_native"):] if "        id: build_opencode2_native" in text else ""
-assert "continue-on-error" not in new_steps
-assert "if: always()" not in new_steps
-PY
+    run python3 "$REPO_ROOT/tests/test_helper/workflow_assertions.py" "$REPO_ROOT/.github/workflows/image-build.yaml" existing
     assert_success
 }
 
@@ -653,13 +561,7 @@ PY
         for target in test test_native test_opencode test_native_opencode test_opencode2 test_native_opencode2; do
             : > "$IMAGE_LOG"
             run make -s -C "$IMAGE_REPO" "HOST_ARCH=$arch" "$target"
-            if [[ "$target" == test_opencode2 || "$target" == test_native_opencode2 ]]; then
-                assert_success
-            elif [[ "$target" == test_opencode || "$target" == test_native_opencode ]]; then
-                assert_success
-            else
-                assert_success
-            fi
+            assert_success
             case "$target" in
                 test)
                     assert_image_builds "[[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"linux/amd64,linux/arm64\",false,false],[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"$expected\",true,false]]"
@@ -680,31 +582,18 @@ PY
                     assert_image_builds "[[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"\",true,false],[\"Dockerfile.OpenCode2\",\"ghcr.io/cwimmer/devcontainer:opencode2\",\"$expected\",true,true]]"
                     ;;
             esac
-            if [[ "$arch" != x86_64 ]]; then
-                case "$target" in
-                    test|test_opencode|test_opencode2)
-                        # Multi-platform recipes retain both architectures and load arm64.
-                        python3 - "$IMAGE_LOG" "$target" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-builds=[a for a in calls if a[:2]==["buildx","build"]]
-native=[a for a in builds if "--load" in a]
-assert native and native[-1][native[-1].index("--platform")+1] == "linux/arm64", (sys.argv[2], builds)
-PY
-                        ;;
-                    *)
-                        python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-builds=[a for a in calls if a[:2]==["buildx","build"]]
-v2=[a for a in builds if "Dockerfile.OpenCode2" in a]
-if v2:
-    assert v2[0][v2[0].index("--platform")+1] == "linux/arm64", v2
-PY
-                        ;;
-                esac
-            fi
         done
+    done
+}
+
+@test "all Make test targets stop after a failed BATS suite" {
+    setup_image_build
+    local target
+    for target in test test_native test_opencode test_native_opencode test_opencode2 test_native_opencode2; do
+        : > "$IMAGE_LOG"
+        run env IMAGE_BATS_STATUS=17 make -s -C "$IMAGE_REPO" "$target"
+        assert_failure
+        assert_suite_failure_stops_followup_builds
     done
 }
 
@@ -716,17 +605,7 @@ PY
     assert_success
     assert_image_builds "[[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"linux/amd64,linux/arm64\",false,false],[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"$native\",true,false],[\"Dockerfile.OpenCode2\",\"ghcr.io/cwimmer/devcontainer:opencode2\",\"linux/amd64,linux/arm64\",false,true],[\"Dockerfile.OpenCode2\",\"ghcr.io/cwimmer/devcontainer:opencode2\",\"$native\",true,true]]"
     assert_image_commands '[["image","inspect","--format","{{.Id}}","ghcr.io/cwimmer/devcontainer:opencode2"],["run","--rm","--pull=never","sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cat","/usr/local/share/asdf-tool-versions"],["run","--rm","--pull=never","sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","opencode","--version"]]'
-    python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-v2=[a for a in calls if a[:2]==["buildx","build"] and "Dockerfile.OpenCode2" in a]
-assert len(v2)==2 and v2[0].index("--platform") < v2[1].index("--platform")
-assert all("--pull" in a for a in v2)
-assert calls.index(v2[-1]) < next(i for i,a in enumerate(calls) if a[:2]==["image","inspect"])
-assert not any("Dockerfile.OpenCode" in a for a in calls)
-base_checks=[i for i,a in enumerate(calls) if a[:3]==["run","--rm","ghcr.io/cwimmer/devcontainer:latest"]]
-assert base_checks and max(base_checks) < calls.index(v2[0]), (base_checks, v2, calls)
-PY
+    assert_v2_builds_precede_verification
 }
 
 @test "v2 native target builds only native" {
@@ -737,18 +616,7 @@ PY
     assert_success
     assert_image_builds "[[\"Dockerfile\",\"ghcr.io/cwimmer/devcontainer:latest\",\"\",true,false],[\"Dockerfile.OpenCode2\",\"ghcr.io/cwimmer/devcontainer:opencode2\",\"$native\",true,true]]"
     assert_image_commands '[["image","inspect","--format","{{.Id}}","ghcr.io/cwimmer/devcontainer:opencode2"],["run","--rm","--pull=never","sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cat","/usr/local/share/asdf-tool-versions"],["run","--rm","--pull=never","sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","opencode","--version"]]'
-    python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-builds=[a for a in calls if a[:2]==["buildx","build"]]
-assert not any("Dockerfile.OpenCode" in a for a in calls)
-base=[i for i,a in enumerate(calls) if a[:2]==["buildx","build"] and ("-f" not in a or a[a.index("-f")+1]=="Dockerfile")]
-v2=next(i for i,a in enumerate(calls) if a[:2]==["buildx","build"] and "Dockerfile.OpenCode2" in a)
-base_runtime=max(i for i,a in enumerate(calls) if a[:3]==["run","--rm","ghcr.io/cwimmer/devcontainer:latest"] and "cat" in a)
-assert base and base[-1] < base_runtime < v2, (base, base_runtime, v2)
-assert len([a for a in builds if "Dockerfile.OpenCode2" in a]) == 1
-assert not any("Dockerfile.OpenCode" in a for a in calls)
-PY
+    assert_v2_builds_precede_verification
 }
 
 @test "v2 Make targets propagate failures instead of checking stale images" {
@@ -760,25 +628,17 @@ PY
             run env IMAGE_FAIL="$failure" IMAGE_ID=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
                 IMAGE_VERSION_OUTPUT=2.10.0 make -s -C "$IMAGE_REPO" "$target"
             assert_failure
-            python3 - "$IMAGE_LOG" "$failure" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert not any(a[:2]==["image","inspect"] or (a[:2]==["run","--rm"] and "--pull=never" in a) for a in calls), calls
-if sys.argv[2] == "base-build":
-    assert not any(a[:2]==["buildx","build"] and "Dockerfile.OpenCode2" in a for a in calls), calls
-PY
+            case "$failure" in
+                base-build) assert_build_failure_stops_verification base-build ;;
+                v2-native-build) assert_build_failure_stops_verification v2-native-build ;;
+            esac
         done
         if [[ "$target" == test_opencode2 ]]; then
             : > "$IMAGE_LOG"
             run env IMAGE_FAIL=v2-multi-build IMAGE_ID=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
                 IMAGE_VERSION_OUTPUT=2.10.0 make -s -C "$IMAGE_REPO" "$target"
             assert_failure
-            python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert not any(a[:2]==["buildx","build"] and "Dockerfile.OpenCode2" in a and "--load" in a for a in calls), calls
-assert not any(a[:2]==["image","inspect"] or (a[:2]==["run","--rm"] and "--pull=never" in a) for a in calls), calls
-PY
+            assert_build_failure_stops_verification v2-multi-build
         fi
     done
 
@@ -790,24 +650,7 @@ PY
             mismatch) run env IMAGE_VERSION_OUTPUT=0.0.0 make -s -C "$IMAGE_REPO" test_native_opencode2 ;;
         esac
         assert_failure
-        python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert any(a[:2]==["image","inspect"] for a in calls), calls
-PY
-        if [[ "$failure" == missing-image ]]; then
-            python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert not any(a[:2]==["run","--rm"] and "--pull=never" in a for a in calls), calls
-PY
-        else
-            python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert any(a[-2:]==["opencode","--version"] for a in calls), calls
-PY
-        fi
+        assert_runtime_failure_stops_at_expected_stage "$failure"
     done
 }
 
@@ -815,34 +658,17 @@ PY
     setup_image_build
     run env IMAGE_FAIL=builder-inspect make -s -C "$IMAGE_REPO" test_native_opencode2
     assert_success
-    python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert ["buildx","create","--name","builder"] in calls
-assert any(a[:2]==["buildx","build"] and "Dockerfile.OpenCode2" in a for a in calls)
-PY
+    assert_builder_fallback_behavior builder-inspect
 
     : > "$IMAGE_LOG"
     run env IMAGE_FAIL=builder-create make -s -C "$IMAGE_REPO" test_native_opencode2
     assert_failure
-    python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert ["buildx","create","--name","builder"] in calls
-assert not any(a[:2]==["buildx","build"] for a in calls), calls
-assert not any(a[:2]==["image","inspect"] for a in calls), calls
-PY
+    assert_builder_fallback_behavior builder-create
 }
 
 @test "clean attempts all three images despite removal failure" {
     setup_image_build
     run env IMAGE_FAIL=remove make -s -k -C "$IMAGE_REPO" clean
     assert_success
-    python3 - "$IMAGE_LOG" <<'PY'
-import json, pathlib, sys
-calls=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-assert ["buildx","rm","builder"] in calls
-for tag in ("latest", "opencode", "opencode2"):
-    assert ["rmi", f"ghcr.io/cwimmer/devcontainer:{tag}"] in calls, calls
-PY
+    assert_cleanup_attempts_all_removals
 }

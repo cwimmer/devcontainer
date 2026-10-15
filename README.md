@@ -129,6 +129,31 @@ consistent. The base targets invoke the suite inside the freshly built base
 image; the derived-image targets first run their base prerequisite and then
 build and check the requested OpenCode variant.
 
+BATS remains the integration runner: keep command orchestration, simple
+assertions, and readable scenario intent in BATS. Literal heredocs are suitable
+for short fixture data, while substantial Python-backed assertions belong in
+named Python helpers, organized by purpose rather than line count. Command-log
+checks live in `tests/test_helper/image_assertions.py`, semantic workflow checks
+in `tests/test_helper/workflow_assertions.py`, and their Python regressions in
+`tests/test_opencode_helpers.py`.
+
+The supported runner installs the test-only dependencies pinned in
+`tests/requirements.txt` (PyYAML 6.0.3 and Ruff 0.14.0) into a temporary
+directory, runs Ruff lint and format checks, and removes the temporary
+directory on exit. Dependency installation needs package-index network access;
+the mocked test scenarios themselves do not access the network or Docker
+daemon. Run the focused OpenCode suite or the complete four-file suite from the
+repository root:
+
+```sh
+bash tests/run-bats.sh tests/test-opencode-support.bats
+bash tests/run-bats.sh tests/test-bats-support.bats tests/test-gh-support.bats tests/test-opencode-support.bats tests/test-file-support.bats
+```
+
+Direct `bats` invocation is also supported when the pinned requirements have
+been explicitly provisioned in the Python environment used by the suite; it
+does not install them automatically.
+
 ### Upgrading tool versions
 
 ```sh

@@ -23,67 +23,55 @@ EOF
 
     export IMAGE_REPO IMAGE_LOG IMAGE_BIN
     export PATH="$IMAGE_BIN:$PATH"
-    unset IMAGE_FAIL IMAGE_ID IMAGE_VERSION_OUTPUT IMAGE_VERSION_STATUS
+    unset IMAGE_FAIL IMAGE_ID IMAGE_VERSION_OUTPUT IMAGE_VERSION_STATUS IMAGE_BATS_STATUS
 }
 
 assert_image_calls() {
-    python3 - "$IMAGE_LOG" "$1" <<'PY'
-import json
-import pathlib
-import sys
-
-actual = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-expected = json.loads(sys.argv[2])
-if actual != expected:
-    raise SystemExit(f"image calls differ\nexpected: {expected!r}\nactual:   {actual!r}")
-PY
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" calls "$1"
 }
 
 assert_no_image_calls() {
-    python3 - "$IMAGE_LOG" <<'PY'
-import pathlib
-import sys
-
-if pathlib.Path(sys.argv[1]).read_text():
-    raise SystemExit(f"expected no image calls, got: {pathlib.Path(sys.argv[1]).read_text()}")
-PY
+    if [[ ! -f "$IMAGE_LOG" ]]; then
+        printf 'expected image log to exist: %s\n' "$IMAGE_LOG" >&2
+        return 1
+    fi
+    if test ! -s "$IMAGE_LOG"; then
+        return 0
+    else
+        printf 'expected no image calls in %s; log contents:\n' "$IMAGE_LOG" >&2
+        cat "$IMAGE_LOG" >&2
+        return 1
+    fi
 }
 
 assert_image_builds() {
-    python3 - "$IMAGE_LOG" "$1" <<'PY'
-import json
-import pathlib
-import sys
-
-calls = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-actual = []
-for args in calls:
-    if args[:2] != ["buildx", "build"]:
-        continue
-    dockerfile = args[args.index("-f") + 1] if "-f" in args else "Dockerfile"
-    actual.append([
-        dockerfile,
-        args[args.index("--tag") + 1],
-        args[args.index("--platform") + 1] if "--platform" in args else "",
-        "--load" in args,
-        "--pull" in args,
-    ])
-expected = json.loads(sys.argv[2])
-if actual != expected:
-    raise SystemExit(f"image builds differ\nexpected: {expected!r}\nactual:   {actual!r}")
-PY
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" builds "$1"
 }
 
 assert_image_commands() {
-    python3 - "$IMAGE_LOG" "$1" <<'PY'
-import json
-import pathlib
-import sys
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" verifier "$1"
+}
 
-calls = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
-actual = [args for args in calls if args[0] == "image" or (args[0] == "run" and "--pull=never" in args)]
-expected = json.loads(sys.argv[2])
-if actual != expected:
-    raise SystemExit(f"image inspection/runtime calls differ\nexpected: {expected!r}\nactual:   {actual!r}")
-PY
+assert_v2_builds_precede_verification() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" v2-order
+}
+
+assert_build_failure_stops_verification() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" build-failure "$1"
+}
+
+assert_runtime_failure_stops_at_expected_stage() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" runtime-failure "$1"
+}
+
+assert_builder_fallback_behavior() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" builder-fallback "$1"
+}
+
+assert_cleanup_attempts_all_removals() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" cleanup
+}
+
+assert_suite_failure_stops_followup_builds() {
+    python3 "$REPO_ROOT/tests/test_helper/image_assertions.py" "$IMAGE_LOG" suite-failure
 }
