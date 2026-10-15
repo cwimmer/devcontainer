@@ -121,6 +121,18 @@ published `ghcr.io/cwimmer/devcontainer:latest` image. The v2 image is configure
 for the `opencode2` destination above; this configuration alone is not evidence
 of a completed registry publication.
 
+### OpenCode v2 data transition
+
+Before the first v2 reopen, copy the complete stopped v1 data volume to a new
+volume with the standalone preparation script. This repository now mounts
+`devcontainer-opencode2-data` at `/root/.local/share/opencode`; the original
+`devcontainer-opencode-data` remains the v1 rollback source. Rebuild and reopen
+with VS Code's **Dev Containers: Rebuild and Reopen in Container**, then verify
+`opencode --version` reports the `2.0.29` pin and confirm sessions persist after
+recreation. Rollback requires restoring both the v1 Dockerfile and original
+volume mount. See the reusable [OpenCode v2 transition runbook](docs/opencode-v2-transition.md)
+for host-side copy, continuity, downstream, and rollback instructions.
+
 ### Testing
 
 The BATS test suite lives in `tests/test-*.bats` and asserts that the
