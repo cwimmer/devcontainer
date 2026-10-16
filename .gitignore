@@ -7,3 +7,6 @@ Dockerfile.OpenCode.backup
 
 # Python bytecode caches
 __pycache__/
+
+# macOS Finder metadata
+.DS_Store
