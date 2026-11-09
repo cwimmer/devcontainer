@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/ubuntu/ubuntu:24.04_stable
+FROM ubuntu.azurecr.io/ubuntu:24.04_stable
 ARG ASDF_VERSION=v0.20.2
 ARG BATS_VERSION=1.14.0
 ARG BATS_ASSERT_VERSION=2.1.0

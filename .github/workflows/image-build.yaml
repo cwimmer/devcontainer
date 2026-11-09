@@ -37,6 +37,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          pull: true
           load: true
           tags: ghcr.io/cwimmer/devcontainer:latest
           platforms: linux/amd64
@@ -58,6 +59,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          pull: true
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/cwimmer/devcontainer:latest
