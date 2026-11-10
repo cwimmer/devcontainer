@@ -1,6 +1,7 @@
 # Backup files created by update-versions.sh
 Dockerfile.backup
 Dockerfile.OpenCode.backup
+Dockerfile.OpenCode2.backup
 
 # Direnv configuration file
 .envrc

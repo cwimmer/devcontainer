@@ -1,6 +1,6 @@
 FROM ghcr.io/cwimmer/devcontainer:latest
 
-ARG OPENCODE_VERSION=2.1.4
+ARG OPENCODE_VERSION=2.2.7
 
 RUN curl -fsSL https://opencode.ai/v2/install -o /tmp/opencode-install \
     && bash /tmp/opencode-install --version "${OPENCODE_VERSION}" --no-modify-path \
